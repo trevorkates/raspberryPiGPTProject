@@ -15,7 +15,7 @@ load_dotenv("/home/keyence/inspector/.env")
 openai.api_key = os.getenv("OPENAI_API_KEY")
 
 FOLDER_PATH   = "/home/keyence/iv3_images"
-POLL_INTERVAL = 5  # seconds
+POLL_INTERVAL = 5  # seconds between folder checks
 
 REFERENCE_EXAMPLES = {
     "https://i.imgur.com/xXbGo0g.jpeg": "ACCEPT - Clean IML sticker, clear and centered branding.",
@@ -92,18 +92,17 @@ class LidInspectorApp:
             tk.Label(self.right, image=self.logo_tk, bg="white").pack(pady=(0,10))
 
         # RIGHT: controls
-        self.start_btn     = tk.Button(self.right, text="Start Inspection", command=self.start_inspection)
-        self.slider_lbl    = tk.Label(self.right, text="Strictness (1-5):", bg="white")
-        self.sensitivity   = tk.Scale(self.right, from_=1, to=5, orient="horizontal",
-                                      bg="white", command=lambda _: self.display_image(force=True))
-        self.result_lbl    = tk.Label(self.right, font=("Helvetica",14),
-                                      wraplength=260, justify="left", bg="white")
-        self.next_btn      = tk.Button(self.right, text="Next Image", command=self.next_image)
-        self.clear_mem_btn = tk.Button(self.right, text="Clear Memory", command=self.clear_memory)
-        self.clear_srv_btn = tk.Button(self.right, text="Clear Server", command=self.clear_server)
+        self.start_btn    = tk.Button(self.right, text="Start Inspection", command=self.start_inspection)
+        self.slider_lbl   = tk.Label(self.right, text="Strictness (1-5):", bg="white")
+        self.sensitivity  = tk.Scale(self.right, from_=1, to=5, orient="horizontal",
+                                     bg="white", command=lambda _: self.display_image(force=True))
+        self.result_lbl   = tk.Label(self.right, font=("Helvetica",14),
+                                     wraplength=260, justify="left", bg="white")
+        self.next_btn     = tk.Button(self.right, text="Next Image", command=self.next_image)
+        self.clear_srv_btn= tk.Button(self.right, text="Clear Server Photos", command=self.clear_server)
 
         for w in (self.start_btn, self.slider_lbl, self.sensitivity,
-                  self.result_lbl, self.next_btn, self.clear_mem_btn, self.clear_srv_btn):
+                  self.result_lbl, self.next_btn, self.clear_srv_btn):
             w.pack(pady=6, fill="x")
 
         self.sensitivity.set(3)
@@ -115,7 +114,6 @@ class LidInspectorApp:
         self.poll_thr = threading.Thread(target=self.watch_folder, daemon=True)
 
     def start_inspection(self):
-        # initialize lists and mark current files as seen
         self.start_btn.pack_forget()
         self.images = list_images()
         self.seen   = set(self.images)
@@ -125,7 +123,6 @@ class LidInspectorApp:
         self.poll_thr.start()
 
     def watch_folder(self):
-        # poll for new files
         while True:
             current = set(list_images())
             new = sorted(current - self.seen)
@@ -167,24 +164,18 @@ class LidInspectorApp:
         self.idx += 1
         self.display_image()
 
-    def clear_memory(self):
-        # reset UI cache so all images reappear
-        files = list_images()
-        self.images = files.copy()
-        self.seen   = set(files)
-        self.idx    = 0
-        self.display_image()
-        self.result_lbl.config(text="Memory cleared – will reprocess images.")
-
     def clear_server(self):
-        # delete all files in the FTP folder
+        # delete all images from the FTP folder
         for fname in os.listdir(FOLDER_PATH):
             try:
                 os.remove(os.path.join(FOLDER_PATH, fname))
             except Exception as e:
                 print(f"Error deleting {fname}: {e}")
-        # then clear UI cache too
-        self.clear_memory()
+        # reset UI list and hide image
+        self.images = []
+        self.seen   = set()
+        self.idx    = 0
+        self.image_label.config(image='')
         self.result_lbl.config(text="Server cleared – folder is now empty.")
 
 if __name__ == "__main__":

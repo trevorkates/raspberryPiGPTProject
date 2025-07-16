@@ -1,7 +1,10 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-import os, time, base64, threading
+import os
+import time
+import base64
+import threading
 import tkinter as tk
 from PIL import Image, ImageTk
 import openai
@@ -20,9 +23,12 @@ REFERENCE_EXAMPLES = {
     "https://i.imgur.com/12zH9va.jpeg": "ACCEPT - Shine is due to lighting reflection, not a defect."
 }
 
+# --- HELPERS -------------------------------------------------------
 def list_images():
-    return sorted(f for f in os.listdir(FOLDER_PATH)
-                  if f.lower().endswith((".jpg", ".jpeg")))
+    return sorted(
+        f for f in os.listdir(FOLDER_PATH)
+        if f.lower().endswith((".jpg", ".jpeg"))
+    )
 
 def encode_image(path):
     with open(path, "rb") as f:
@@ -40,18 +46,18 @@ def classify_image(path, sensitivity):
         "You are an expert lid inspector. Return exactly 'ACCEPT - reason' or 'REJECT - reason'. "
         f"Strictness {sensitivity}/5: {levels[sensitivity]}"
     )
-    msgs = [{"role":"system","content":prompt}]
+    messages = [{"role":"system","content":prompt}]
     for url, expl in REFERENCE_EXAMPLES.items():
-        msgs.append({"role":"user","content":f"{expl} Image: {url}"})
+        messages.append({"role":"user","content":f"{expl} Image: {url}"})
     b64 = encode_image(path)
-    msgs.append({
+    messages.append({
         "role":"user",
         "content":[
             {"type":"text","text":"Now evaluate this image:"},
             {"type":"image_url","image_url":{"url":"data:image/jpeg;base64," + b64}}
         ]
     })
-    resp = openai.ChatCompletion.create(model="gpt-4o", messages=msgs)
+    resp = openai.ChatCompletion.create(model="gpt-4o", messages=messages)
     return resp.choices[0].message.content.strip()
 
 # --- APPLICATION ----------------------------------------------------
@@ -65,20 +71,19 @@ class LidInspectorApp:
         container = tk.Frame(root, bg="white")
         container.pack(fill="both", expand=True, padx=10, pady=10)
 
-        # left and right fixed‑size frames
+        # fixed-size left/right panels
         self.left = tk.Frame(container, bg="white", width=400, height=600)
         self.right= tk.Frame(container, bg="white", width=380, height=600)
         self.left.pack(side="left", fill="both")
         self.right.pack(side="right", fill="y")
-        # prevent them from resizing when children change
         self.left.pack_propagate(False)
         self.right.pack_propagate(False)
 
-        # LEFT: image area
+        # LEFT: image display
         self.image_label = tk.Label(self.left, bg="white")
         self.image_label.pack(fill="both", expand=True)
 
-        # RIGHT TOP: logo
+        # RIGHT TOP: optional logo
         logo_path = os.path.join(os.path.dirname(__file__), "logo.png")
         if os.path.exists(logo_path):
             img = Image.open(logo_path)
@@ -86,42 +91,49 @@ class LidInspectorApp:
             self.logo_tk = ImageTk.PhotoImage(img)
             tk.Label(self.right, image=self.logo_tk, bg="white").pack(pady=(0,10))
 
-        # RIGHT controls
-        self.start_btn   = tk.Button(self.right, text="Start Inspection", command=self.start_inspection)
-        self.slider_lbl  = tk.Label(self.right, text="Strictness (1-5):", bg="white")
-        self.sensitivity = tk.Scale(self.right, from_=1, to=5, orient="horizontal",
-                                    bg="white", command=lambda _: self.display_image(force=True))
-        self.result_lbl  = tk.Label(self.right, font=("Helvetica",14),
-                                    wraplength=260, justify="left", bg="white")
-        self.next_btn    = tk.Button(self.right, text="Next Image", command=self.next_image)
+        # RIGHT: controls
+        self.start_btn     = tk.Button(self.right, text="Start Inspection", command=self.start_inspection)
+        self.slider_lbl    = tk.Label(self.right, text="Strictness (1-5):", bg="white")
+        self.sensitivity   = tk.Scale(self.right, from_=1, to=5, orient="horizontal",
+                                      bg="white", command=lambda _: self.display_image(force=True))
+        self.result_lbl    = tk.Label(self.right, font=("Helvetica",14),
+                                      wraplength=260, justify="left", bg="white")
+        self.next_btn      = tk.Button(self.right, text="Next Image", command=self.next_image)
+        self.clear_mem_btn = tk.Button(self.right, text="Clear Memory", command=self.clear_memory)
+        self.clear_srv_btn = tk.Button(self.right, text="Clear Server", command=self.clear_server)
 
-        for w in (self.start_btn, self.slider_lbl, self.sensitivity, self.result_lbl, self.next_btn):
+        for w in (self.start_btn, self.slider_lbl, self.sensitivity,
+                  self.result_lbl, self.next_btn, self.clear_mem_btn, self.clear_srv_btn):
             w.pack(pady=6, fill="x")
 
         self.sensitivity.set(3)
 
-        # state
+        # internal state
         self.images   = []
         self.idx      = 0
+        self.seen     = set()
         self.poll_thr = threading.Thread(target=self.watch_folder, daemon=True)
 
     def start_inspection(self):
+        # initialize lists and mark current files as seen
         self.start_btn.pack_forget()
         self.images = list_images()
+        self.seen   = set(self.images)
+        self.idx    = 0
         if self.images:
             self.display_image()
         self.poll_thr.start()
 
     def watch_folder(self):
-        seen = set(self.images)
+        # poll for new files
         while True:
             current = set(list_images())
-            new = sorted(current - seen)
+            new = sorted(current - self.seen)
             if new:
                 self.images.extend(new)
                 self.idx = len(self.images) - len(new)
                 self.display_image()
-                seen = current
+                self.seen = current
             time.sleep(POLL_INTERVAL)
 
     def display_image(self, force=False):
@@ -155,7 +167,27 @@ class LidInspectorApp:
         self.idx += 1
         self.display_image()
 
-if __name__=="__main__":
+    def clear_memory(self):
+        # reset UI cache so all images reappear
+        files = list_images()
+        self.images = files.copy()
+        self.seen   = set(files)
+        self.idx    = 0
+        self.display_image()
+        self.result_lbl.config(text="Memory cleared – will reprocess images.")
+
+    def clear_server(self):
+        # delete all files in the FTP folder
+        for fname in os.listdir(FOLDER_PATH):
+            try:
+                os.remove(os.path.join(FOLDER_PATH, fname))
+            except Exception as e:
+                print(f"Error deleting {fname}: {e}")
+        # then clear UI cache too
+        self.clear_memory()
+        self.result_lbl.config(text="Server cleared – folder is now empty.")
+
+if __name__ == "__main__":
     root = tk.Tk()
     app  = LidInspectorApp(root)
     root.mainloop()

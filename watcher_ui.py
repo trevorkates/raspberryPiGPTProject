@@ -67,7 +67,7 @@ def classify_image(image_path, sensitivity):
 class LidInspectorApp:
     def __init__(self, root):
         self.root = root
-        self.root.title("🗑️ Trash Lid Inspector")
+        self.root.title("Trash Lid Inspector")
         self.root.geometry("800x650")
         self.root.configure(bg="white")
 
@@ -115,7 +115,7 @@ class LidInspectorApp:
 
     def display_image(self, force=False):
         if self.index >= len(self.image_list):
-            self.result_label.config(text="🎉 All images reviewed.")
+            self.result_label.config(text="All images reviewed.")
             return
         path = os.path.join(FOLDER_PATH, self.image_list[self.index])
         try:

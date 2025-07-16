@@ -50,7 +50,8 @@ def classify_image(path, sensitivity, no_brand_mode):
     if no_brand_mode:
         focus = "Focus solely on flash, surface quality, and color consistency. Ignore any branding or IML label."
     else:
-        focus = levels[sensitivity]
+        focus = levels[sensitivity] + " If no branding or IML sticker is visible, treat that as a defect and REJECT."
+
     system_prompt = (
         "You are an expert lid inspector given a base64-encoded image. "
         "You have direct visual access via the encoded image, so DO NOT refuse to evaluate. "
@@ -72,7 +73,7 @@ def classify_image(path, sensitivity, no_brand_mode):
         ]
     })
     resp = openai.ChatCompletion.create(
-        model="gpt-4o",  # vision-capable model
+        model="gpt-4o",
         messages=messages
     )
     return resp.choices[0].message.content.strip()

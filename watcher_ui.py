@@ -12,7 +12,7 @@ load_dotenv("/home/keyence/inspector/.env")
 openai.api_key = os.getenv("OPENAI_API_KEY")
 
 FOLDER_PATH   = "/home/keyence/iv3_images"
-POLL_INTERVAL = 5
+POLL_INTERVAL = 5  # seconds
 
 REFERENCE_EXAMPLES = {
     "https://i.imgur.com/xXbGo0g.jpeg": "ACCEPT - Clean IML sticker, clear and centered branding.",
@@ -21,7 +21,8 @@ REFERENCE_EXAMPLES = {
 }
 
 def list_images():
-    return sorted(f for f in os.listdir(FOLDER_PATH) if f.lower().endswith((".jpg", ".jpeg")))
+    return sorted(f for f in os.listdir(FOLDER_PATH)
+                  if f.lower().endswith((".jpg", ".jpeg")))
 
 def encode_image(path):
     with open(path, "rb") as f:
@@ -56,7 +57,7 @@ def classify_image(path, sensitivity):
 # --- APPLICATION ----------------------------------------------------
 class LidInspectorApp:
     def __init__(self, root):
-        root.title("Trash Lid Inspector")
+        root.title("CM1 Lid Inspector")
         root.geometry("800x600")
         root.configure(bg="white")
 
@@ -64,32 +65,34 @@ class LidInspectorApp:
         container = tk.Frame(root, bg="white")
         container.pack(fill="both", expand=True, padx=10, pady=10)
 
-        # left: image; right: controls
-        self.left  = tk.Frame(container, bg="white")
-        self.right = tk.Frame(container, bg="white")
-        self.left.pack(side="left", fill="both", expand=True)
+        # left and right fixed‑size frames
+        self.left = tk.Frame(container, bg="white", width=400, height=600)
+        self.right= tk.Frame(container, bg="white", width=380, height=600)
+        self.left.pack(side="left", fill="both")
         self.right.pack(side="right", fill="y")
+        # prevent them from resizing when children change
+        self.left.pack_propagate(False)
+        self.right.pack_propagate(False)
 
-        # LEFT: image display
+        # LEFT: image area
         self.image_label = tk.Label(self.left, bg="white")
         self.image_label.pack(fill="both", expand=True)
 
         # RIGHT TOP: logo
         logo_path = os.path.join(os.path.dirname(__file__), "logo.png")
         if os.path.exists(logo_path):
-            logo_img = Image.open(logo_path)
-            logo_img.thumbnail((100,100), Image.ANTIALIAS)
-            self.logo_tk = ImageTk.PhotoImage(logo_img)
+            img = Image.open(logo_path)
+            img.thumbnail((100,100), Image.ANTIALIAS)
+            self.logo_tk = ImageTk.PhotoImage(img)
             tk.Label(self.right, image=self.logo_tk, bg="white").pack(pady=(0,10))
 
-        # RIGHT: controls
+        # RIGHT controls
         self.start_btn   = tk.Button(self.right, text="Start Inspection", command=self.start_inspection)
         self.slider_lbl  = tk.Label(self.right, text="Strictness (1-5):", bg="white")
         self.sensitivity = tk.Scale(self.right, from_=1, to=5, orient="horizontal",
                                     bg="white", command=lambda _: self.display_image(force=True))
-        # wraplength ensures full text is visible
         self.result_lbl  = tk.Label(self.right, font=("Helvetica",14),
-                                    wraplength=250, justify="left", bg="white")
+                                    wraplength=260, justify="left", bg="white")
         self.next_btn    = tk.Button(self.right, text="Next Image", command=self.next_image)
 
         for w in (self.start_btn, self.slider_lbl, self.sensitivity, self.result_lbl, self.next_btn):
@@ -97,7 +100,7 @@ class LidInspectorApp:
 
         self.sensitivity.set(3)
 
-        # internal state
+        # state
         self.images   = []
         self.idx      = 0
         self.poll_thr = threading.Thread(target=self.watch_folder, daemon=True)

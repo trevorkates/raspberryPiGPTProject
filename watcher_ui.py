@@ -36,7 +36,8 @@ def encode_image(path):
         return base64.b64encode(f.read()).decode()
 
 # Prompt GPT-4 Vision with high confidence requirement
-def classify_image(path, sensitivity):
+# and optional no-brand mode
+def classify_image(path, sensitivity, no_brand_mode):
     levels = {
         1: "Accept nearly everything, even with obvious imperfections.",
         2: "Accept mild streaks or small misprints. Reject only major flaws.",
@@ -44,15 +45,20 @@ def classify_image(path, sensitivity):
         4: "Strict - Minor streaks or off-center prints may be REJECTED.",
         5: "Very strict - Any defect should result in REJECT."
     }
+    if no_brand_mode:
+        focus = "Focus solely on flash, surface quality, color consistency. Ignore any branding or IML label."
+    else:
+        focus = levels[sensitivity]
     system_prompt = (
-        "You are an expert lid inspector. Classify whether a trash-can lid image "
-        "should be ACCEPTED or REJECTED. Return exactly 'ACCEPT - reason (Confidence: XX%)' "
-        "or 'REJECT - reason (Confidence: XX%)', ensuring confidence between 90% and 100%. "
-        f"Strictness {sensitivity}/5: {levels[sensitivity]}"
+        "You are an expert lid inspector. Return exactly 'ACCEPT - reason (Confidence: XX%)' "
+        "or 'REJECT - reason (Confidence: XX%)'. Ensure confidence between 90% and 100%. "
+        f"Strictness {sensitivity}/5: {focus}"
     )
     messages = [{"role": "system", "content": system_prompt}]
-    for url, example in REFERENCE_EXAMPLES.items():
-        messages.append({"role": "user", "content": f"{example} Image: {url}"})
+    # Include examples only if branding matters
+    if not no_brand_mode:
+        for url, example in REFERENCE_EXAMPLES.items():
+            messages.append({"role": "user", "content": f"{example} Image: {url}"})
     b64 = encode_image(path)
     messages.append({
         "role": "user",
@@ -78,7 +84,7 @@ class LidInspectorApp:
         container = tk.Frame(root, bg="white")
         container.pack(fill="both", expand=True, padx=10, pady=10)
 
-        # Left/right fixed panels
+        # Fixed-size left/right panels
         self.left = tk.Frame(container, bg="white", width=400, height=600)
         self.right = tk.Frame(container, bg="white", width=380, height=600)
         self.left.pack(side="left", fill="both")
@@ -105,17 +111,23 @@ class LidInspectorApp:
             self.right, from_=1, to=5, orient="horizontal",
             bg="white", command=lambda _: self.display_image(force=True)
         )
+        self.no_brand_var = tk.BooleanVar(value=False)
+        self.no_brand_cb = tk.Checkbutton(
+            self.right, text="No Brand/IML Mode", variable=self.no_brand_var,
+            bg="white"
+        )
         self.result_lbl = tk.Label(
             self.right, font=("Helvetica", 14), wraplength=260,
             justify="left", bg="white"
         )
         self.next_btn = tk.Button(self.right, text="Next Image", command=self.next_image)
         self.clear_srv_btn = tk.Button(
-            self.right, text="Clear Server Photos", command=self.clear_server)
+            self.right, text="Clear Server Photos", command=self.clear_server)  
 
+        # Pack controls
         for w in (
             self.start_btn, self.slider_lbl, self.sensitivity,
-            self.result_lbl, self.next_btn, self.clear_srv_btn
+            self.no_brand_cb, self.result_lbl, self.next_btn, self.clear_srv_btn
         ):
             w.pack(pady=6, fill="x")
 
@@ -149,7 +161,7 @@ class LidInspectorApp:
 
     def display_image(self, force=False):
         if self.idx >= len(self.images):
-            self.result_lbl.config(text="All images reviewed.")
+            self.result_lbl.config(text="All images reviewed.", fg="black")
             return
 
         path = os.path.join(FOLDER_PATH, self.images[self.idx])
@@ -168,9 +180,9 @@ class LidInspectorApp:
     def analyze(self, path):
         self.result_lbl.config(fg="orange", text="Analyzing...")
         try:
-            verdict = classify_image(path, self.sensitivity.get())
-            # ensure high confidence display
-            self.result_lbl.config(fg=("green" if verdict.upper().startswith("ACCEPT") else "red"), text=verdict)
+            verdict = classify_image(path, self.sensitivity.get(), self.no_brand_var.get())
+            color = "green" if verdict.upper().startswith("ACCEPT") else "red"
+            self.result_lbl.config(fg=color, text=verdict)
         except Exception as e:
             self.result_lbl.config(fg="red", text=f"Error: {e}")
 
@@ -179,13 +191,13 @@ class LidInspectorApp:
         self.display_image()
 
     def clear_server(self):
-        # delete all images from the FTP folder
+        # delete all images in FTP folder
         for fname in os.listdir(FOLDER_PATH):
             try:
                 os.remove(os.path.join(FOLDER_PATH, fname))
             except Exception as e:
                 print(f"Error deleting {fname}: {e}")
-        # reset UI state and clear display
+        # reset UI state
         self.images = []
         self.seen = set()
         self.idx = 0

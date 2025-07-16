@@ -45,15 +45,18 @@ def classify_image(path, sensitivity, no_brand_mode):
         4: "Strict - Minor streaks or off-center prints may be REJECTED.",
         5: "Very strict - Any defect should result in REJECT."
     }
+    # Guidance from Quality Manager: you are an expert inspector, highly confident,
+    # focusing on visual quality, color, flash, and surface defects.
     if no_brand_mode:
-        focus = "Focus solely on flash, surface quality, color consistency. Ignore any branding or IML label."
+        focus = "Focus solely on flash, surface quality, and color consistency. Ignore any branding or IML label."
     else:
         focus = levels[sensitivity]
     system_prompt = (
-        "You are an expert lid inspector. Return exactly 'ACCEPT - reason (Confidence: XX%)'"
-        " or 'REJECT - reason (Confidence: XX%)'. Ensure confidence between 90% and 100%."
-        f" Strictness {sensitivity}/5: {focus}."
-        " Note: shine from lighting reflection is not a defect; do not confuse reflections with streaks."
+        "You are an expert lid inspector given a base64-encoded image. "
+        "You have direct visual access via the encoded image, so DO NOT refuse to evaluate. "
+        "Return exactly 'ACCEPT - reason (Confidence: XX%)' or 'REJECT - reason (Confidence: XX%)'. "
+        f"Ensure confidence is a high value between 90% and 100%. Strictness {sensitivity}/5: {focus}. "
+        "Note: shine from lighting reflection is not a defect; do not confuse reflections with streaks."
     )
     messages = [{"role": "system", "content": system_prompt}]
     # Include examples only if branding matters
@@ -69,7 +72,7 @@ def classify_image(path, sensitivity, no_brand_mode):
         ]
     })
     resp = openai.ChatCompletion.create(
-        model="gpt-4o",
+        model="gpt-4o",  # vision-capable model
         messages=messages
     )
     return resp.choices[0].message.content.strip()

@@ -50,9 +50,10 @@ def classify_image(path, sensitivity, no_brand_mode):
     else:
         focus = levels[sensitivity]
     system_prompt = (
-        "You are an expert lid inspector. Return exactly 'ACCEPT - reason (Confidence: XX%)' "
-        "or 'REJECT - reason (Confidence: XX%)'. Ensure confidence between 90% and 100%. "
-        f"Strictness {sensitivity}/5: {focus}"
+        "You are an expert lid inspector. Return exactly 'ACCEPT - reason (Confidence: XX%)'"
+        " or 'REJECT - reason (Confidence: XX%)'. Ensure confidence between 90% and 100%."
+        f" Strictness {sensitivity}/5: {focus}."
+        " Note: shine from lighting reflection is not a defect; do not confuse reflections with streaks."
     )
     messages = [{"role": "system", "content": system_prompt}]
     # Include examples only if branding matters
@@ -80,11 +81,11 @@ class LidInspectorApp:
         root.geometry("800x600")
         root.configure(bg="white")
 
-        # Main container
+        # main container
         container = tk.Frame(root, bg="white")
         container.pack(fill="both", expand=True, padx=10, pady=10)
 
-        # Fixed-size left/right panels
+        # fixed-size left/right panels
         self.left = tk.Frame(container, bg="white", width=400, height=600)
         self.right = tk.Frame(container, bg="white", width=380, height=600)
         self.left.pack(side="left", fill="both")
@@ -114,7 +115,8 @@ class LidInspectorApp:
         self.no_brand_var = tk.BooleanVar(value=False)
         self.no_brand_cb = tk.Checkbutton(
             self.right, text="No Brand/IML Mode", variable=self.no_brand_var,
-            bg="white"
+            bg="lightgrey", width=20,
+            command=lambda: self.display_image(force=True)
         )
         self.result_lbl = tk.Label(
             self.right, font=("Helvetica", 14), wraplength=260,
@@ -122,9 +124,10 @@ class LidInspectorApp:
         )
         self.next_btn = tk.Button(self.right, text="Next Image", command=self.next_image)
         self.clear_srv_btn = tk.Button(
-            self.right, text="Clear Server Photos", command=self.clear_server)  
+            self.right, text="Clear Server Photos", command=self.clear_server
+        )
 
-        # Pack controls
+        # pack controls
         for w in (
             self.start_btn, self.slider_lbl, self.sensitivity,
             self.no_brand_cb, self.result_lbl, self.next_btn, self.clear_srv_btn
@@ -133,7 +136,7 @@ class LidInspectorApp:
 
         self.sensitivity.set(3)
 
-        # Internal state
+        # internal state
         self.images = []
         self.idx = 0
         self.seen = set()

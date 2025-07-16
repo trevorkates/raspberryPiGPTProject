@@ -14,7 +14,7 @@ from dotenv import load_dotenv
 load_dotenv("/home/keyence/inspector/.env")
 openai.api_key = os.getenv("OPENAI_API_KEY")
 
-FOLDER_PATH   = "/home/keyence/inspector/iv3_images"
+FOLDER_PATH   = "/home/keyence/iv3_images"
 POLL_INTERVAL = 5  # seconds between folder checks
 
 # Few-shot examples to guide GPT-4 Vision

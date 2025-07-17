@@ -6,19 +6,20 @@ import time
 import base64
 import threading
 import tkinter as tk
-from PIL import Image, ImageTk
+from PIL import Image, ImageTk, ImageEnhance
 from gpiozero import OutputDevice
 import openai
 from dotenv import load_dotenv
+from io import BytesIO
 
 # --- CONFIG --------------------------------------------------------
 load_dotenv("/home/keyence/inspector/.env")
 openai.api_key = os.getenv("OPENAI_API_KEY")
 
 FOLDER_PATH   = "/home/keyence/iv3_images"
-POLL_INTERVAL = 3  # seconds between folder checks
+POLL_INTERVAL = 2  # check every 2 seconds
 
-# Digital output pin for ACCEPT (GPIO19)
+# GPIO pin for ACCEPT signal
 accept_output = OutputDevice(19, active_high=True, initial_value=False)
 
 # Few-shot examples to guide GPT-4 Vision
@@ -41,9 +42,19 @@ def is_file_stable(path, wait_time=1.0):
     size2 = os.path.getsize(path)
     return size1 == size2
 
-def encode_image(path):
-    with open(path, "rb") as f:
-        return base64.b64encode(f.read()).decode()
+def clean_jpeg(path):
+    try:
+        with Image.open(path) as img:
+            # Enhance brightness slightly for dark lids
+            enhancer = ImageEnhance.Brightness(img)
+            img = enhancer.enhance(1.2)  # boost brightness by 20%
+
+            with BytesIO() as buffer:
+                img.save(buffer, format="JPEG", quality=90)
+                return base64.b64encode(buffer.getvalue()).decode()
+    except Exception as e:
+        print(f"JPEG cleanup error: {e}")
+        return None
 
 def classify_image(path, sensitivity, no_brand_mode):
     levels = {
@@ -73,7 +84,11 @@ def classify_image(path, sensitivity, no_brand_mode):
     if not no_brand_mode:
         for url, example in REFERENCE_EXAMPLES.items():
             messages.append({"role": "user", "content": f"{example} Image: {url}"})
-    b64 = encode_image(path)
+
+    b64 = clean_jpeg(path)
+    if not b64:
+        return "Error: Unable to clean and encode JPEG."
+
     messages.append({
         "role": "user",
         "content": [
@@ -81,13 +96,10 @@ def classify_image(path, sensitivity, no_brand_mode):
             {"type": "image_url", "image_url": {"url": "data:image/jpeg;base64," + b64}}
         ]
     })
-    resp = openai.ChatCompletion.create(
-        model="gpt-4o",
-        messages=messages
-    )
+    resp = openai.ChatCompletion.create(model="gpt-4o", messages=messages)
     return resp.choices[0].message.content.strip()
 
-# --- APPLICATION ----------------------------------------------------
+# --- UI APP --------------------------------------------------------
 class LidInspectorApp:
     def __init__(self, root):
         root.title("CM1 Lid Inspector")
@@ -118,10 +130,7 @@ class LidInspectorApp:
             self.right,
             text="Start Inspection",
             command=self.start_inspection,
-            bg="#4CAF50",
-            fg="white",
-            font=("Helvetica", 12, "bold"),
-            height=2
+            bg="#4CAF50", fg="white", font=("Helvetica", 12, "bold"), height=2
         )
 
         self.slider_lbl = tk.Label(self.right, text="Strictness (1-5):", bg="white")
@@ -132,17 +141,14 @@ class LidInspectorApp:
         self.no_brand_var = tk.BooleanVar(value=False)
         self.no_brand_cb = tk.Checkbutton(
             self.right, text="No Brand/IML Mode", variable=self.no_brand_var,
-            bg="lightgrey", width=20,
-            command=lambda: self.display_image(force=True)
+            bg="lightgrey", width=20, command=lambda: self.display_image(force=True)
         )
         self.result_lbl = tk.Label(
             self.right, font=("Helvetica", 14), wraplength=260,
             justify="left", bg="white"
         )
         self.next_btn = tk.Button(self.right, text="Next Image", command=self.next_image)
-        self.clear_srv_btn = tk.Button(
-            self.right, text="Clear Server Photos", command=self.clear_server
-        )
+        self.clear_srv_btn = tk.Button(self.right, text="Clear Server Photos", command=self.clear_server)
 
         for w in (
             self.start_btn, self.slider_lbl, self.sensitivity,
@@ -154,6 +160,7 @@ class LidInspectorApp:
         self.images = []
         self.idx = 0
         self.seen = set()
+        self.analyzing = False
         self.poll_thr = threading.Thread(target=self.watch_folder, daemon=True)
 
     def start_inspection(self):
@@ -167,13 +174,14 @@ class LidInspectorApp:
 
     def watch_folder(self):
         while True:
-            current = set(list_images())
-            new = sorted(current - self.seen)
-            if new:
-                self.images.extend(new)
-                self.idx = len(self.images) - len(new)
-                self.display_image()
-                self.seen = current
+            if not self.analyzing:
+                current = set(list_images())
+                new = sorted(current - self.seen)
+                if new:
+                    self.images.extend(new)
+                    self.idx = len(self.images) - len(new)
+                    self.display_image()
+                    self.seen = current
             time.sleep(POLL_INTERVAL)
 
     def display_image(self, force=False):
@@ -199,21 +207,24 @@ class LidInspectorApp:
         threading.Thread(target=self.analyze, args=(path,), daemon=True).start()
 
     def analyze(self, path):
+        self.analyzing = True
         self.result_lbl.config(fg="orange", text="Analyzing...")
+        accept_output.off()
+
         try:
             verdict = classify_image(path, self.sensitivity.get(), self.no_brand_var.get())
             color = "green" if verdict.upper().startswith("ACCEPT") else "red"
             self.result_lbl.config(fg=color, text=verdict)
 
-            # Send GPIO signal
             if verdict.upper().startswith("ACCEPT"):
                 accept_output.on()
             else:
                 accept_output.off()
-
         except Exception as e:
             self.result_lbl.config(fg="red", text=f"Error: {e}")
-            accept_output.off()  # fail-safe off
+            accept_output.off()
+        finally:
+            self.analyzing = False
 
     def next_image(self):
         self.idx += 1

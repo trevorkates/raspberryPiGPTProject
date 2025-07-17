@@ -7,6 +7,7 @@ import base64
 import threading
 import tkinter as tk
 from PIL import Image, ImageTk
+from io import BytesIO
 import openai
 from dotenv import load_dotenv
 
@@ -15,7 +16,7 @@ load_dotenv("/home/keyence/inspector/.env")
 openai.api_key = os.getenv("OPENAI_API_KEY")
 
 FOLDER_PATH   = "/home/keyence/iv3_images"
-POLL_INTERVAL = 5  # seconds between folder checks
+POLL_INTERVAL = 3  # seconds between folder checks
 
 # Few-shot examples to guide GPT-4 Vision
 REFERENCE_EXAMPLES = {
@@ -28,15 +29,21 @@ REFERENCE_EXAMPLES = {
 def list_images():
     return sorted(
         f for f in os.listdir(FOLDER_PATH)
-        if f.lower().endswith((".jpg", ".jpeg"))
+        if f.lower().endswith(".png")
     )
 
-def encode_image(path):
-    with open(path, "rb") as f:
-        return base64.b64encode(f.read()).decode()
+def is_file_stable(path, wait_time=1.0):
+    size1 = os.path.getsize(path)
+    time.sleep(wait_time)
+    size2 = os.path.getsize(path)
+    return size1 == size2
 
-# Prompt GPT-4 Vision with high confidence requirement
-# and optional no-brand mode
+def encode_image(path):
+    with Image.open(path) as img:
+        with BytesIO() as buffer:
+            img.save(buffer, format="PNG")
+            return base64.b64encode(buffer.getvalue()).decode()
+
 def classify_image(path, sensitivity, no_brand_mode):
     levels = {
         1: "Accept nearly everything, even with obvious imperfections.",
@@ -45,22 +52,23 @@ def classify_image(path, sensitivity, no_brand_mode):
         4: "Strict - Minor streaks or off-center prints may be REJECTED.",
         5: "Very strict - Any defect should result in REJECT."
     }
-    # Guidance from Quality Manager: you are an expert inspector, highly confident,
-    # focusing on visual quality, color, flash, and surface defects.
-    if no_brand_mode:
-        focus = "Focus solely on flash, surface quality, and color consistency. Ignore any branding or IML label."
-    else:
-        focus = levels[sensitivity] + " If no branding or IML sticker is visible, treat that as a defect and REJECT."
+
+    focus = (
+        "Focus solely on flash, surface quality, and color consistency. Ignore any branding or IML label."
+        if no_brand_mode else
+        levels[sensitivity] + " If no branding or IML sticker is visible, treat that as a defect and REJECT."
+    )
 
     system_prompt = (
         "You are an expert lid inspector given a base64-encoded image. "
-        "You have direct visual access via the encoded image, so DO NOT refuse to evaluate. "
+        "You have direct visual access via the encoded image. "
+        "Never say you cannot evaluate. Even if blurry, unclear, or low-resolution, you must make your best judgment. "
         "Return exactly 'ACCEPT - reason (Confidence: XX%)' or 'REJECT - reason (Confidence: XX%)'. "
-        f"Ensure confidence is a high value between 90% and 100%. Strictness {sensitivity}/5: {focus}. "
+        f"Ensure confidence is a high value between 90% and 100%. Strictness {sensitivity}/5: {focus} "
         "Note: shine from lighting reflection is not a defect; do not confuse reflections with streaks."
     )
+
     messages = [{"role": "system", "content": system_prompt}]
-    # Include examples only if branding matters
     if not no_brand_mode:
         for url, example in REFERENCE_EXAMPLES.items():
             messages.append({"role": "user", "content": f"{example} Image: {url}"})
@@ -69,7 +77,7 @@ def classify_image(path, sensitivity, no_brand_mode):
         "role": "user",
         "content": [
             {"type": "text", "text": "Now evaluate this image:"},
-            {"type": "image_url", "image_url": {"url": "data:image/jpeg;base64," + b64}}
+            {"type": "image_url", "image_url": {"url": "data:image/png;base64," + b64}}
         ]
     })
     resp = openai.ChatCompletion.create(
@@ -85,11 +93,9 @@ class LidInspectorApp:
         root.geometry("800x600")
         root.configure(bg="white")
 
-        # main container
         container = tk.Frame(root, bg="white")
         container.pack(fill="both", expand=True, padx=10, pady=10)
 
-        # fixed-size left/right panels
         self.left = tk.Frame(container, bg="white", width=400, height=600)
         self.right = tk.Frame(container, bg="white", width=380, height=600)
         self.left.pack(side="left", fill="both")
@@ -97,11 +103,9 @@ class LidInspectorApp:
         self.left.pack_propagate(False)
         self.right.pack_propagate(False)
 
-        # LEFT: image display
         self.image_label = tk.Label(self.left, bg="white")
         self.image_label.pack(fill="both", expand=True)
 
-        # RIGHT TOP: optional logo
         logo_path = os.path.join(os.path.dirname(__file__), "logo.png")
         if os.path.exists(logo_path):
             img = Image.open(logo_path)
@@ -109,7 +113,6 @@ class LidInspectorApp:
             self.logo_tk = ImageTk.PhotoImage(img)
             tk.Label(self.right, image=self.logo_tk, bg="white").pack(pady=(0, 10))
 
-        # RIGHT: controls
         self.start_btn = tk.Button(self.right, text="Start Inspection", command=self.start_inspection)
         self.slider_lbl = tk.Label(self.right, text="Strictness (1-5):", bg="white")
         self.sensitivity = tk.Scale(
@@ -131,7 +134,6 @@ class LidInspectorApp:
             self.right, text="Clear Server Photos", command=self.clear_server
         )
 
-        # pack controls
         for w in (
             self.start_btn, self.slider_lbl, self.sensitivity,
             self.no_brand_cb, self.result_lbl, self.next_btn, self.clear_srv_btn
@@ -139,8 +141,6 @@ class LidInspectorApp:
             w.pack(pady=6, fill="x")
 
         self.sensitivity.set(3)
-
-        # internal state
         self.images = []
         self.idx = 0
         self.seen = set()
@@ -172,6 +172,10 @@ class LidInspectorApp:
             return
 
         path = os.path.join(FOLDER_PATH, self.images[self.idx])
+        if not is_file_stable(path):
+            self.result_lbl.config(fg="red", text="Skipping unstable file. Will retry.")
+            return
+
         try:
             img = Image.open(path)
             img.thumbnail((400, 300), Image.ANTIALIAS)
@@ -198,13 +202,11 @@ class LidInspectorApp:
         self.display_image()
 
     def clear_server(self):
-        # delete all images in FTP folder
         for fname in os.listdir(FOLDER_PATH):
             try:
                 os.remove(os.path.join(FOLDER_PATH, fname))
             except Exception as e:
                 print(f"Error deleting {fname}: {e}")
-        # reset UI state
         self.images = []
         self.seen = set()
         self.idx = 0

@@ -7,7 +7,7 @@ import base64
 import threading
 import tkinter as tk
 from PIL import Image, ImageTk
-from io import BytesIO
+from gpiozero import OutputDevice
 import openai
 from dotenv import load_dotenv
 
@@ -17,6 +17,9 @@ openai.api_key = os.getenv("OPENAI_API_KEY")
 
 FOLDER_PATH   = "/home/keyence/iv3_images"
 POLL_INTERVAL = 3  # seconds between folder checks
+
+# Digital output pin for ACCEPT (GPIO19)
+accept_output = OutputDevice(19, active_high=True, initial_value=False)
 
 # Few-shot examples to guide GPT-4 Vision
 REFERENCE_EXAMPLES = {
@@ -29,7 +32,7 @@ REFERENCE_EXAMPLES = {
 def list_images():
     return sorted(
         f for f in os.listdir(FOLDER_PATH)
-        if f.lower().endswith(".png")
+        if f.lower().endswith((".jpg", ".jpeg"))
     )
 
 def is_file_stable(path, wait_time=1.0):
@@ -39,10 +42,8 @@ def is_file_stable(path, wait_time=1.0):
     return size1 == size2
 
 def encode_image(path):
-    with Image.open(path) as img:
-        with BytesIO() as buffer:
-            img.save(buffer, format="PNG")
-            return base64.b64encode(buffer.getvalue()).decode()
+    with open(path, "rb") as f:
+        return base64.b64encode(f.read()).decode()
 
 def classify_image(path, sensitivity, no_brand_mode):
     levels = {
@@ -77,7 +78,7 @@ def classify_image(path, sensitivity, no_brand_mode):
         "role": "user",
         "content": [
             {"type": "text", "text": "Now evaluate this image:"},
-            {"type": "image_url", "image_url": {"url": "data:image/png;base64," + b64}}
+            {"type": "image_url", "image_url": {"url": "data:image/jpeg;base64," + b64}}
         ]
     })
     resp = openai.ChatCompletion.create(
@@ -117,8 +118,8 @@ class LidInspectorApp:
             self.right,
             text="Start Inspection",
             command=self.start_inspection,
-            bg="#4CAF50",       # green background
-            fg="white",         # white text
+            bg="#4CAF50",
+            fg="white",
             font=("Helvetica", 12, "bold"),
             height=2
         )
@@ -203,8 +204,16 @@ class LidInspectorApp:
             verdict = classify_image(path, self.sensitivity.get(), self.no_brand_var.get())
             color = "green" if verdict.upper().startswith("ACCEPT") else "red"
             self.result_lbl.config(fg=color, text=verdict)
+
+            # Send GPIO signal
+            if verdict.upper().startswith("ACCEPT"):
+                accept_output.on()
+            else:
+                accept_output.off()
+
         except Exception as e:
             self.result_lbl.config(fg="red", text=f"Error: {e}")
+            accept_output.off()  # fail-safe off
 
     def next_image(self):
         self.idx += 1

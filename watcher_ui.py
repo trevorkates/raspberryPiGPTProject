@@ -113,7 +113,16 @@ class LidInspectorApp:
             self.logo_tk = ImageTk.PhotoImage(img)
             tk.Label(self.right, image=self.logo_tk, bg="white").pack(pady=(0, 10))
 
-        self.start_btn = tk.Button(self.right, text="Start Inspection", command=self.start_inspection)
+        self.start_btn = tk.Button(
+            self.right,
+            text="Start Inspection",
+            command=self.start_inspection,
+            bg="#4CAF50",       # green background
+            fg="white",         # white text
+            font=("Helvetica", 12, "bold"),
+            height=2
+        )
+
         self.slider_lbl = tk.Label(self.right, text="Strictness (1-5):", bg="white")
         self.sensitivity = tk.Scale(
             self.right, from_=1, to=5, orient="horizontal",

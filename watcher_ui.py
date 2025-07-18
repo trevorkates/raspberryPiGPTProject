@@ -236,7 +236,7 @@ class LidInspectorApp:
     def update_repo(self):
         try:
             out = subprocess.check_output(["git", "-C", "/home/keyence/inspector", "pull"]).decode()
-            self.result_lbl.config(text=f"🔁 Git updated:
+            self.result_lbl.config(text=f"🔁 Git updated: {output}"
 {out}", fg="blue")
         except Exception as e:
             self.result_lbl.config(text=f"Git update failed: {e}", fg="red")

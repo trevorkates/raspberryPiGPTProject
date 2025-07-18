@@ -136,12 +136,12 @@ class LidInspectorApp:
         self.no_brand_cb = tk.Checkbutton(self.right, text="No Brand/IML Mode",
                                           variable=self.no_brand_var, bg="lightgrey")
 
-        self.start_btn = tk.Button(self.right, text="▶ Start", command=self.start_inspection, bg="green", fg="white")
-        self.next_btn = tk.Button(self.right, text="→ Next", command=self.next_image)
-        self.clear_btn = tk.Button(self.right, text="🗑️ Clear Folder", command=self.clear_server)
-        self.git_btn = tk.Button(self.right, text="🔄 Check for Update", command=self.update_repo)
-        self.manual_accept = tk.Button(self.right, text="✔ Manual Accept", command=lambda: accept_output.on())
-        self.manual_reject = tk.Button(self.right, text="✖ Manual Reject", command=lambda: reject_output.on())
+        self.start_btn = tk.Button(self.right, text="Start", command=self.start_inspection, bg="green", fg="white")
+        self.next_btn = tk.Button(self.right, text="Next", command=self.next_image)
+        self.clear_btn = tk.Button(self.right, text="Clear Folder", command=self.clear_server)
+        self.git_btn = tk.Button(self.right, text="Check for Update", command=self.update_repo)
+        self.manual_accept = tk.Button(self.right, text="Manual Accept", command=lambda: accept_output.on())
+        self.manual_reject = tk.Button(self.right, text="Manual Reject", command=lambda: reject_output.on())
 
         for w in (
             self.slider_lbl, self.sensitivity, self.no_brand_cb, self.result_lbl,
@@ -178,12 +178,12 @@ class LidInspectorApp:
 
     def display_image(self):
         if self.idx >= len(self.images):
-            self.result_lbl.config(text="✅ All images reviewed.", fg="black", bg="white")
+            self.result_lbl.config(text="All images reviewed.", fg="black", bg="white")
             return
 
         path = os.path.join(FOLDER_PATH, self.images[self.idx])
         if not is_file_stable(path):
-            self.result_lbl.config(text="⏳ Skipping unstable file...", fg="orange", bg="white")
+            self.result_lbl.config(text="Skipping unstable file...", fg="orange", bg="white")
             return
 
         try:
@@ -196,7 +196,7 @@ class LidInspectorApp:
             return
 
         self.result_lbl.config(text="", bg="white")
-        self.progress_lbl.config(text=f"🖼️ {self.idx+1} of {len(self.images)}")
+        self.progress_lbl.config(text=f"Image {self.idx+1} of {len(self.images)}")
         threading.Thread(target=self.analyze, args=(path,), daemon=True).start()
 
     def analyze(self, path):
@@ -236,8 +236,8 @@ class LidInspectorApp:
     def update_repo(self):
         try:
             out = subprocess.check_output(["git", "-C", "/home/keyence/inspector", "pull"]).decode()
-            self.result_lbl.config(text=f"[UPDATE] Git updated:
-{out}", fg="blue")
+            self.result_lbl.config(text="[UPDATE] Git updated:
+" + out, fg="blue")
         except Exception as e:
             self.result_lbl.config(text=f"Git update failed: {e}", fg="red")
 

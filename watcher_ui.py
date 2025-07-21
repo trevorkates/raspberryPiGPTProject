@@ -12,12 +12,15 @@ import openai
 from dotenv import load_dotenv
 from io import BytesIO
 
+from pymodbus.server.sync import StartTcpServer
+from pymodbus.datastore import ModbusSlaveContext, ModbusServerContext, ModbusSequentialDataBlock
+
 # --- CONFIG --------------------------------------------------------
 load_dotenv("/home/keyence/inspector/.env")
 openai.api_key = os.getenv("OPENAI_API_KEY")
 
 FOLDER_PATH   = "/home/keyence/iv3_images"
-POLL_INTERVAL = 2  # check every 2 seconds
+POLL_INTERVAL = 2  # seconds between folder checks
 
 # GPIO pin for ACCEPT signal
 accept_output = OutputDevice(19, active_high=True, initial_value=False)
@@ -28,6 +31,17 @@ REFERENCE_EXAMPLES = {
     "https://i.imgur.com/NDmSVPz.jpeg": "REJECT - White streaks are clearly visible in the print layer.",
     "https://i.imgur.com/12zH9va.jpeg": "ACCEPT - Shine is due to lighting reflection, not a defect."
 }
+
+# --- MODBUS SETUP ---------------------------------------------
+# Single slave, discrete inputs at address 0
+store     = ModbusSlaveContext(di=ModbusSequentialDataBlock(0, [0]))
+modbus_ctx= ModbusServerContext(slaves=store, single=True)
+
+def run_modbus():
+    # Listen on all interfaces, port 502
+    StartTcpServer(modbus_ctx, address=("0.0.0.0", 502))
+
+threading.Thread(target=run_modbus, daemon=True).start()
 
 # --- HELPERS -------------------------------------------------------
 def list_images():
@@ -62,13 +76,11 @@ def classify_image(path, sensitivity, no_brand_mode):
         4: "Strict - Minor streaks or off-center prints may be REJECTED.",
         5: "Very strict - Any defect should result in REJECT."
     }
-
     focus = (
         "Focus solely on flash, surface quality, and color consistency. Ignore any branding or IML label."
         if no_brand_mode else
         levels[sensitivity] + " If no branding or IML sticker is visible, treat that as a defect and REJECT."
     )
-
     system_prompt = (
         "You are an expert lid inspector given a base64-encoded image. "
         "You have direct visual access via the encoded image. "
@@ -77,16 +89,13 @@ def classify_image(path, sensitivity, no_brand_mode):
         f"Ensure confidence is a high value between 90% and 100%. Strictness {sensitivity}/5: {focus} "
         "Note: shine from lighting reflection is not a defect; do not confuse reflections with streaks."
     )
-
     messages = [{"role": "system", "content": system_prompt}]
     if not no_brand_mode:
         for url, example in REFERENCE_EXAMPLES.items():
             messages.append({"role": "user", "content": f"{example} Image: {url}"})
-
     b64 = clean_jpeg(path)
     if not b64:
         return "Error: Unable to clean and encode JPEG."
-
     messages.append({
         "role": "user",
         "content": [
@@ -128,22 +137,20 @@ class LidInspectorApp:
 
         # Start button
         self.start_btn = tk.Button(
-            self.right,
-            text="Start Inspection",
+            self.right, text="Start Inspection",
             command=self.start_inspection,
-            bg="#4CAF50", fg="white", font=("Helvetica", 12, "bold"), height=2
+            bg="#4CAF50", fg="white",
+            font=("Helvetica", 12, "bold"), height=2
         )
 
-        # Spinbox for strictness instead of slider
-        self.slider_lbl = tk.Label(self.right, text="Strictness (1–5):", bg="white", font=("Helvetica", 14))
+        # Spinbox for strictness
+        self.slider_lbl = tk.Label(self.right, text="Strictness (1–5):",
+                                   bg="white", font=("Helvetica", 14))
         self.sensitivity_var = tk.IntVar(value=2)
         self.sensitivity_spinbox = tk.Spinbox(
-            self.right,
-            from_=1,
-            to=5,
+            self.right, from_=1, to=5,
             textvariable=self.sensitivity_var,
-            font=("Helvetica", 18),
-            width=4,
+            font=("Helvetica", 18), width=4,
             justify="center",
             command=lambda: self.display_image(force=True)
         )
@@ -151,36 +158,31 @@ class LidInspectorApp:
         # No-brand checkbox
         self.no_brand_var = tk.BooleanVar(value=False)
         self.no_brand_cb = tk.Checkbutton(
-            self.right,
-            text="No Brand/IML Mode",
+            self.right, text="No Brand/IML Mode",
             variable=self.no_brand_var,
-            bg="lightgrey",
-            width=20,
+            bg="lightgrey", width=20,
             command=lambda: self.display_image(force=True)
         )
 
         # Result label
         self.result_lbl = tk.Label(
-            self.right,
-            font=("Helvetica", 14),
-            wraplength=260,
-            justify="left",
-            bg="white"
+            self.right, font=("Helvetica", 14),
+            wraplength=260, justify="left", bg="white"
         )
 
         # Navigation buttons
         self.next_btn = tk.Button(self.right, text="Next Image", command=self.next_image)
-        self.clear_srv_btn = tk.Button(self.right, text="Clear Server Photos", command=self.clear_server)
+        self.clear_srv_btn = tk.Button(
+            self.right, text="Clear Server Photos", command=self.clear_server
+        )
 
-        # Pack everything
+        # Pack widgets
         for w in (
             self.start_btn,
-            self.slider_lbl,
-            self.sensitivity_spinbox,
+            self.slider_lbl, self.sensitivity_spinbox,
             self.no_brand_cb,
             self.result_lbl,
-            self.next_btn,
-            self.clear_srv_btn
+            self.next_btn, self.clear_srv_btn
         ):
             w.pack(pady=6, fill="x")
 
@@ -238,10 +240,13 @@ class LidInspectorApp:
         self.analyzing = True
         self.result_lbl.config(fg="orange", text="Analyzing...")
         accept_output.off()
-
         try:
             lvl = self.sensitivity_var.get()
             verdict = classify_image(path, lvl, self.no_brand_var.get())
+            # Write the verdict bit to Modbus register 0
+            bit = 1 if verdict.upper().startswith("ACCEPT") else 0
+            modbus_ctx[0].setValues(2, 0, [bit])
+
             color = "green" if verdict.upper().startswith("ACCEPT") else "red"
             self.result_lbl.config(fg=color, text=verdict)
 
@@ -270,6 +275,7 @@ class LidInspectorApp:
         self.idx = 0
         self.image_label.config(image="")
         self.result_lbl.config(text="Server cleared - folder is now empty.", fg="black")
+
 
 if __name__ == "__main__":
     root = tk.Tk()

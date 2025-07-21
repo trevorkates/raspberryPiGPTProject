@@ -45,10 +45,8 @@ def is_file_stable(path, wait_time=1.0):
 def clean_jpeg(path):
     try:
         with Image.open(path) as img:
-            # Enhance brightness slightly for dark lids
             enhancer = ImageEnhance.Brightness(img)
             img = enhancer.enhance(1.2)  # boost brightness by 20%
-
             with BytesIO() as buffer:
                 img.save(buffer, format="JPEG", quality=90)
                 return base64.b64encode(buffer.getvalue()).decode()
@@ -116,9 +114,11 @@ class LidInspectorApp:
         self.left.pack_propagate(False)
         self.right.pack_propagate(False)
 
+        # Image display area
         self.image_label = tk.Label(self.left, bg="white")
         self.image_label.pack(fill="both", expand=True)
 
+        # Logo (if available)
         logo_path = os.path.join(os.path.dirname(__file__), "logo.png")
         if os.path.exists(logo_path):
             img = Image.open(logo_path)
@@ -126,6 +126,7 @@ class LidInspectorApp:
             self.logo_tk = ImageTk.PhotoImage(img)
             tk.Label(self.right, image=self.logo_tk, bg="white").pack(pady=(0, 10))
 
+        # Start button
         self.start_btn = tk.Button(
             self.right,
             text="Start Inspection",
@@ -133,39 +134,57 @@ class LidInspectorApp:
             bg="#4CAF50", fg="white", font=("Helvetica", 12, "bold"), height=2
         )
 
-        self.slider_lbl = tk.Label(self.right, text="Strictness (1-5):", bg="white")
-        self.sensitivity = tk.Scale(
+        # Spinbox for strictness instead of slider
+        self.slider_lbl = tk.Label(self.right, text="Strictness (1–5):", bg="white", font=("Helvetica", 14))
+        self.sensitivity_var = tk.IntVar(value=3)
+        self.sensitivity_spinbox = tk.Spinbox(
             self.right,
             from_=1,
             to=5,
-            orient="horizontal",
-            length=300,               # wider for easier touch input
-            sliderlength=40,          # makes the thumb easier to grab
-            tickinterval=1,           # shows tick marks for each value
-            font=("Helvetica", 14),   # large font for labels
-            bg="white",
-            command=lambda _: self.display_image(force=True)
+            textvariable=self.sensitivity_var,
+            font=("Helvetica", 18),
+            width=4,
+            justify="center",
+            command=lambda: self.display_image(force=True)
         )
-        
+
+        # No-brand checkbox
         self.no_brand_var = tk.BooleanVar(value=False)
         self.no_brand_cb = tk.Checkbutton(
-            self.right, text="No Brand/IML Mode", variable=self.no_brand_var,
-            bg="lightgrey", width=20, command=lambda: self.display_image(force=True)
+            self.right,
+            text="No Brand/IML Mode",
+            variable=self.no_brand_var,
+            bg="lightgrey",
+            width=20,
+            command=lambda: self.display_image(force=True)
         )
+
+        # Result label
         self.result_lbl = tk.Label(
-            self.right, font=("Helvetica", 14), wraplength=260,
-            justify="left", bg="white"
+            self.right,
+            font=("Helvetica", 14),
+            wraplength=260,
+            justify="left",
+            bg="white"
         )
+
+        # Navigation buttons
         self.next_btn = tk.Button(self.right, text="Next Image", command=self.next_image)
         self.clear_srv_btn = tk.Button(self.right, text="Clear Server Photos", command=self.clear_server)
 
+        # Pack everything
         for w in (
-            self.start_btn, self.slider_lbl, self.sensitivity,
-            self.no_brand_cb, self.result_lbl, self.next_btn, self.clear_srv_btn
+            self.start_btn,
+            self.slider_lbl,
+            self.sensitivity_spinbox,
+            self.no_brand_cb,
+            self.result_lbl,
+            self.next_btn,
+            self.clear_srv_btn
         ):
             w.pack(pady=6, fill="x")
 
-        self.sensitivity.set(3)
+        # Initialize state
         self.images = []
         self.idx = 0
         self.seen = set()
@@ -221,7 +240,8 @@ class LidInspectorApp:
         accept_output.off()
 
         try:
-            verdict = classify_image(path, self.sensitivity.get(), self.no_brand_var.get())
+            lvl = self.sensitivity_var.get()
+            verdict = classify_image(path, lvl, self.no_brand_var.get())
             color = "green" if verdict.upper().startswith("ACCEPT") else "red"
             self.result_lbl.config(fg=color, text=verdict)
 

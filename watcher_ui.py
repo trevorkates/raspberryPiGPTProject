@@ -51,17 +51,11 @@ def list_images():
         if f.lower().endswith((".jpg", ".jpeg"))
     )
 
-def wait_until_stable(path, timeout=5, check=0.5):
-    """Return True if path size doesn’t change for `check` seconds, or False after timeout."""
-    start = time.time()
-    prev = -1
-    while time.time() - start < timeout:
-        size = os.path.getsize(path)
-        if size == prev:
-            return True
-        prev = size
-        time.sleep(check)
-    return False
+def is_file_stable(path, wait_time=1.0):
+    size1 = os.path.getsize(path)
+    time.sleep(wait_time)
+    size2 = os.path.getsize(path)
+    return size1 == size2
 
 def clean_jpeg(path):
     try:
@@ -226,9 +220,11 @@ class LidInspectorApp:
 
         path = os.path.join(FOLDER_PATH, self.images[self.idx])
         # give the file POLL_INTERVAL seconds to finish writing, retry if still unstable
-        if not wait_until_stable(path, timeout=5):
-            self.result_lbl.config(fg="red", text="Still writing… retrying soon.")
-            self.right.after(int(1000 * check), lambda: self.display_image(force=True))
+        if not is_file_stable(path, wait_time=POLL_INTERVAL) and not force:
+            self.result_lbl.config(fg="red", text="Skipping unstable file. Will retry.")
+            # schedule a forced retry after POLL_INTERVAL seconds
+            self.right.after(int(POLL_INTERVAL * 1000),
+                             lambda: self.display_image(force=True))
             return
 
         try:

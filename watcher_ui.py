@@ -136,7 +136,7 @@ class LidInspectorApp:
 
         # Spinbox for strictness instead of slider
         self.slider_lbl = tk.Label(self.right, text="Strictness (1–5):", bg="white", font=("Helvetica", 14))
-        self.sensitivity_var = tk.IntVar(value=3)
+        self.sensitivity_var = tk.IntVar(value=2)
         self.sensitivity_spinbox = tk.Spinbox(
             self.right,
             from_=1,

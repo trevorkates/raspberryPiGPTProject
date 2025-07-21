@@ -238,6 +238,8 @@ class LidInspectorApp:
     def analyze(self, path):
         self.analyzing = True
         self.result_lbl.config(fg="orange", text="Analyzing...")
+        # turn off both ACCEPT (bit 0) and REJECT (bit 1) while we analyze
+        modbus_ctx[0].setValues(2, 0, [0, 0])
         accept_output.off()
         try:
             lvl = self.sensitivity_var.get()

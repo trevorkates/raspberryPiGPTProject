@@ -219,8 +219,12 @@ class LidInspectorApp:
             return
 
         path = os.path.join(FOLDER_PATH, self.images[self.idx])
-        if not is_file_stable(path):
+        # give the file POLL_INTERVAL seconds to finish writing, retry if still unstable
+        if not is_file_stable(path, wait_time=POLL_INTERVAL) and not force:
             self.result_lbl.config(fg="red", text="Skipping unstable file. Will retry.")
+            # schedule a forced retry after POLL_INTERVAL seconds
+            self.right.after(int(POLL_INTERVAL * 1000),
+                             lambda: self.display_image(force=True))
             return
 
         try:

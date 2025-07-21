@@ -11,31 +11,25 @@ from gpiozero import OutputDevice
 import openai
 from dotenv import load_dotenv
 from io import BytesIO
-import json
 
 # --- CONFIG --------------------------------------------------------
 load_dotenv("/home/keyence/inspector/.env")
 openai.api_key = os.getenv("OPENAI_API_KEY")
 
-FOLDER_PATH = "/home/keyence/iv3_images"
-SETTINGS_FILE = "/home/keyence/inspector/prompt_settings.json"
-POLL_INTERVAL = 2
+FOLDER_PATH   = "/home/keyence/iv3_images"
+POLL_INTERVAL = 2  # check every 2 seconds
 
+# GPIO pin for ACCEPT signal
 accept_output = OutputDevice(19, active_high=True, initial_value=False)
 
+# Few-shot examples to guide GPT-4 Vision
 REFERENCE_EXAMPLES = {
     "https://i.imgur.com/xXbGo0g.jpeg": "ACCEPT - Clean IML sticker, clear and centered branding.",
     "https://i.imgur.com/NDmSVPz.jpeg": "REJECT - White streaks are clearly visible in the print layer.",
     "https://i.imgur.com/12zH9va.jpeg": "ACCEPT - Shine is due to lighting reflection, not a defect."
 }
 
-def get_prompt_settings():
-    try:
-        with open(SETTINGS_FILE) as f:
-            return json.load(f)
-    except:
-        return {"strictness": 3, "no_brand": False, "custom": ""}
-
+# --- HELPERS -------------------------------------------------------
 def list_images():
     return sorted(
         f for f in os.listdir(FOLDER_PATH)
@@ -51,8 +45,10 @@ def is_file_stable(path, wait_time=1.0):
 def clean_jpeg(path):
     try:
         with Image.open(path) as img:
+            # Enhance brightness slightly for dark lids
             enhancer = ImageEnhance.Brightness(img)
-            img = enhancer.enhance(1.2)
+            img = enhancer.enhance(1.2)  # boost brightness by 20%
+
             with BytesIO() as buffer:
                 img.save(buffer, format="JPEG", quality=90)
                 return base64.b64encode(buffer.getvalue()).decode()
@@ -60,12 +56,7 @@ def clean_jpeg(path):
         print(f"JPEG cleanup error: {e}")
         return None
 
-def classify_image(path):
-    settings = get_prompt_settings()
-    sensitivity = int(settings.get("strictness", 3))
-    no_brand_mode = settings.get("no_brand", False)
-    custom_text = settings.get("custom", "")
-
+def classify_image(path, sensitivity, no_brand_mode):
     levels = {
         1: "Accept nearly everything, even with obvious imperfections.",
         2: "Accept mild streaks or small misprints. Reject only major flaws.",
@@ -86,8 +77,7 @@ def classify_image(path):
         "Never say you cannot evaluate. Even if blurry, unclear, or low-resolution, you must make your best judgment. "
         "Return exactly 'ACCEPT - reason (Confidence: XX%)' or 'REJECT - reason (Confidence: XX%)'. "
         f"Ensure confidence is a high value between 90% and 100%. Strictness {sensitivity}/5: {focus} "
-        "Note: shine from lighting reflection is not a defect; do not confuse reflections with streaks. "
-        f"{custom_text}"
+        "Note: shine from lighting reflection is not a defect; do not confuse reflections with streaks."
     )
 
     messages = [{"role": "system", "content": system_prompt}]
@@ -143,6 +133,25 @@ class LidInspectorApp:
             bg="#4CAF50", fg="white", font=("Helvetica", 12, "bold"), height=2
         )
 
+        self.slider_lbl = tk.Label(self.right, text="Strictness (1-5):", bg="white")
+        self.sensitivity = tk.Scale(
+            self.right,
+            from_=1,
+            to=5,
+            orient="horizontal",
+            length=300,               # wider for easier touch input
+            sliderlength=40,          # makes the thumb easier to grab
+            tickinterval=1,           # shows tick marks for each value
+            font=("Helvetica", 14),   # large font for labels
+            bg="white",
+            command=lambda _: self.display_image(force=True)
+        )
+        
+        self.no_brand_var = tk.BooleanVar(value=False)
+        self.no_brand_cb = tk.Checkbutton(
+            self.right, text="No Brand/IML Mode", variable=self.no_brand_var,
+            bg="lightgrey", width=20, command=lambda: self.display_image(force=True)
+        )
         self.result_lbl = tk.Label(
             self.right, font=("Helvetica", 14), wraplength=260,
             justify="left", bg="white"
@@ -151,10 +160,12 @@ class LidInspectorApp:
         self.clear_srv_btn = tk.Button(self.right, text="Clear Server Photos", command=self.clear_server)
 
         for w in (
-            self.start_btn, self.result_lbl, self.next_btn, self.clear_srv_btn
+            self.start_btn, self.slider_lbl, self.sensitivity,
+            self.no_brand_cb, self.result_lbl, self.next_btn, self.clear_srv_btn
         ):
             w.pack(pady=6, fill="x")
 
+        self.sensitivity.set(3)
         self.images = []
         self.idx = 0
         self.seen = set()
@@ -182,7 +193,7 @@ class LidInspectorApp:
                     self.seen = current
             time.sleep(POLL_INTERVAL)
 
-    def display_image(self):
+    def display_image(self, force=False):
         if self.idx >= len(self.images):
             self.result_lbl.config(text="All images reviewed.", fg="black")
             return
@@ -210,7 +221,7 @@ class LidInspectorApp:
         accept_output.off()
 
         try:
-            verdict = classify_image(path)
+            verdict = classify_image(path, self.sensitivity.get(), self.no_brand_var.get())
             color = "green" if verdict.upper().startswith("ACCEPT") else "red"
             self.result_lbl.config(fg=color, text=verdict)
 

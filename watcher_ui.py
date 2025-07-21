@@ -25,7 +25,7 @@ POLL_INTERVAL = 2  # seconds between folder checks
 # GPIO pin for ACCEPT signal
 accept_output = OutputDevice(19, active_high=True, initial_value=False)
 
-# Few-shot examples to guide GPT-4 Vision
+# Few‑shot examples to guide GPT‑4 Vision
 REFERENCE_EXAMPLES = {
     "https://i.imgur.com/xXbGo0g.jpeg": "ACCEPT - Clean IML sticker, clear and centered branding.",
     "https://i.imgur.com/NDmSVPz.jpeg": "REJECT - White streaks are clearly visible in the print layer.",
@@ -33,14 +33,15 @@ REFERENCE_EXAMPLES = {
 }
 
 # --- MODBUS SETUP ---------------------------------------------
-# Single slave, discrete inputs at address 0
-store     = ModbusSlaveContext(di=ModbusSequentialDataBlock(0, [0]))
-modbus_ctx= ModbusServerContext(slaves=store, single=True)
+# allocate two discrete inputs at addresses 0 (ACCEPT) and 1 (REJECT)
+store      = ModbusSlaveContext(di=ModbusSequentialDataBlock(0, [0, 0]))
+modbus_ctx = ModbusServerContext(slaves=store, single=True)
 
 def run_modbus():
-    # Listen on all interfaces, port 502
+    # listen on all interfaces, port 502
     StartTcpServer(modbus_ctx, address=("0.0.0.0", 502))
 
+# start Modbus server in background
 threading.Thread(target=run_modbus, daemon=True).start()
 
 # --- HELPERS -------------------------------------------------------
@@ -123,39 +124,39 @@ class LidInspectorApp:
         self.left.pack_propagate(False)
         self.right.pack_propagate(False)
 
-        # Image display area
+        # Image display
         self.image_label = tk.Label(self.left, bg="white")
         self.image_label.pack(fill="both", expand=True)
 
-        # Logo (if available)
+        # Logo if present
         logo_path = os.path.join(os.path.dirname(__file__), "logo.png")
         if os.path.exists(logo_path):
             img = Image.open(logo_path)
             img.thumbnail((100, 100), Image.ANTIALIAS)
             self.logo_tk = ImageTk.PhotoImage(img)
-            tk.Label(self.right, image=self.logo_tk, bg="white").pack(pady=(0, 10))
+            tk.Label(self.right, image=self.logo_tk, bg="white").pack(pady=(0,10))
 
         # Start button
         self.start_btn = tk.Button(
             self.right, text="Start Inspection",
             command=self.start_inspection,
             bg="#4CAF50", fg="white",
-            font=("Helvetica", 12, "bold"), height=2
+            font=("Helvetica",12,"bold"), height=2
         )
 
         # Spinbox for strictness
         self.slider_lbl = tk.Label(self.right, text="Strictness (1–5):",
-                                   bg="white", font=("Helvetica", 14))
+                                   bg="white", font=("Helvetica",14))
         self.sensitivity_var = tk.IntVar(value=2)
         self.sensitivity_spinbox = tk.Spinbox(
             self.right, from_=1, to=5,
             textvariable=self.sensitivity_var,
-            font=("Helvetica", 18), width=4,
+            font=("Helvetica",18), width=4,
             justify="center",
             command=lambda: self.display_image(force=True)
         )
 
-        # No-brand checkbox
+        # No‑brand checkbox
         self.no_brand_var = tk.BooleanVar(value=False)
         self.no_brand_cb = tk.Checkbutton(
             self.right, text="No Brand/IML Mode",
@@ -166,15 +167,13 @@ class LidInspectorApp:
 
         # Result label
         self.result_lbl = tk.Label(
-            self.right, font=("Helvetica", 14),
+            self.right, font=("Helvetica",14),
             wraplength=260, justify="left", bg="white"
         )
 
         # Navigation buttons
         self.next_btn = tk.Button(self.right, text="Next Image", command=self.next_image)
-        self.clear_srv_btn = tk.Button(
-            self.right, text="Clear Server Photos", command=self.clear_server
-        )
+        self.clear_srv_btn = tk.Button(self.right, text="Clear Server Photos", command=self.clear_server)
 
         # Pack widgets
         for w in (
@@ -186,7 +185,7 @@ class LidInspectorApp:
         ):
             w.pack(pady=6, fill="x")
 
-        # Initialize state
+        # Initial state
         self.images = []
         self.idx = 0
         self.seen = set()
@@ -243,9 +242,12 @@ class LidInspectorApp:
         try:
             lvl = self.sensitivity_var.get()
             verdict = classify_image(path, lvl, self.no_brand_var.get())
-            # Write the verdict bit to Modbus register 0
-            bit = 1 if verdict.upper().startswith("ACCEPT") else 0
-            modbus_ctx[0].setValues(2, 0, [bit])
+
+            # Prepare bits for Modbus: bit0=ACCEPT, bit1=REJECT
+            bit0 = 1 if verdict.upper().startswith("ACCEPT") else 0
+            bit1 = 1 if verdict.upper().startswith("REJECT") else 0
+            # write both bits into registers 0 and 1
+            modbus_ctx[0].setValues(2, 0, [bit0, bit1])
 
             color = "green" if verdict.upper().startswith("ACCEPT") else "red"
             self.result_lbl.config(fg=color, text=verdict)

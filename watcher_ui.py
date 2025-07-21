@@ -135,9 +135,18 @@ class LidInspectorApp:
 
         self.slider_lbl = tk.Label(self.right, text="Strictness (1-5):", bg="white")
         self.sensitivity = tk.Scale(
-            self.right, from_=1, to=5, orient="horizontal",
-            bg="white", command=lambda _: self.display_image(force=True)
+            self.right,
+            from_=1,
+            to=5,
+            orient="horizontal",
+            length=300,               # wider for easier touch input
+            sliderlength=40,          # makes the thumb easier to grab
+            tickinterval=1,           # shows tick marks for each value
+            font=("Helvetica", 14),   # large font for labels
+            bg="white",
+            command=lambda _: self.display_image(force=True)
         )
+        
         self.no_brand_var = tk.BooleanVar(value=False)
         self.no_brand_cb = tk.Checkbutton(
             self.right, text="No Brand/IML Mode", variable=self.no_brand_var,

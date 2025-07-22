@@ -20,7 +20,7 @@ load_dotenv("/home/keyence/inspector/.env")
 openai.api_key = os.getenv("OPENAI_API_KEY")
 
 FOLDER_PATH   = "/home/keyence/iv3_images"
-POLL_INTERVAL = 2  # seconds between folder checks
+POLL_INTERVAL = 2.5 # seconds between folder checks
 
 # GPIO pin for ACCEPT signal
 accept_output = OutputDevice(19, active_high=True, initial_value=False)

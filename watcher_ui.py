@@ -133,20 +133,26 @@ class LidInspectorApp:
         self.image_label = tk.Label(self.left, bg="white")
         self.image_label.pack(fill="both", expand=True)
 
+        # Logo and counter side-by-side
         logo_path = os.path.join(os.path.dirname(__file__), "logo.png")
+        logo_counter_frame = tk.Frame(self.right, bg="white")
+        logo_counter_frame.pack(pady=(0, 10), fill="x")
+
         if os.path.exists(logo_path):
             img = Image.open(logo_path)
             img.thumbnail((100, 100), Image.ANTIALIAS)
             self.logo_tk = ImageTk.PhotoImage(img)
-            tk.Label(self.right, image=self.logo_tk, bg="white").pack(pady=(0,10))
+            tk.Label(logo_counter_frame, image=self.logo_tk, bg="white").pack(side="left", padx=(0, 10))
 
-        self.counter_frame = tk.Frame(self.right, bg="white")
-        self.counter_frame.pack(pady=(0, 10))
+        self.counter_frame = tk.Frame(logo_counter_frame, bg="white")
+        self.counter_frame.pack(side="left", anchor="n")
+
         self.accept_label = tk.Label(self.counter_frame, text="Accepted: 0", font=("Helvetica", 12), fg="green", bg="white")
         self.reject_label = tk.Label(self.counter_frame, text="Rejected: 0", font=("Helvetica", 12), fg="red", bg="white")
-        self.accept_label.pack(anchor="e")
-        self.reject_label.pack(anchor="e")
-
+        
+        self.accept_label.pack(anchor="w")
+        self.reject_label.pack(anchor="w")
+        
         self.start_btn = tk.Button(self.right, text="Start Inspection", command=self.start_inspection, bg="#4CAF50", fg="white", font=("Helvetica",12,"bold"), height=2)
 
         self.slider_lbl = tk.Label(self.right, text="Strictness (1–5):", bg="white", font=("Helvetica",14))

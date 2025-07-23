@@ -137,18 +137,19 @@ class LidInspectorApp:
         topbar = tk.Frame(self.right, bg="white")
         topbar.pack(fill="x", pady=(0, 10))
 
-        # Centered logo
+        # Logo centered in its own row
+        logo_row = tk.Frame(topbar, bg="white")
+        logo_row.pack(fill="x")
         logo_path = os.path.join(os.path.dirname(__file__), "logo.png")
         if os.path.exists(logo_path):
             img = Image.open(logo_path)
             img.thumbnail((100, 100), Image.ANTIALIAS)
             self.logo_tk = ImageTk.PhotoImage(img)
-            logo_label = tk.Label(topbar, image=self.logo_tk, bg="white")
-            logo_label.place(relx=0.5, anchor="n")  # Centered
+            tk.Label(logo_row, image=self.logo_tk, bg="white").pack(anchor="center")
 
-        # Counters (top right)
+        # Counters (top right, in separate frame)
         self.counter_frame = tk.Frame(topbar, bg="white")
-        self.counter_frame.pack(side="right", anchor="ne", padx=10)
+        self.counter_frame.pack(anchor="ne", side="right", padx=10)
 
         self.accept_label = tk.Label(self.counter_frame, text="Accepted: 0", font=("Helvetica", 12), fg="green", bg="white")
         self.reject_label = tk.Label(self.counter_frame, text="Rejected: 0", font=("Helvetica", 12), fg="red", bg="white")

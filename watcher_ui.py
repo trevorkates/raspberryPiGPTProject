@@ -133,29 +133,30 @@ class LidInspectorApp:
         self.image_label = tk.Label(self.left, bg="white")
         self.image_label.pack(fill="both", expand=True)
 
-        # Top bar with logo (centered) and counters (top right)
+                # Top bar with logo (left) and counters (right) in one horizontal row
         topbar = tk.Frame(self.right, bg="white")
         topbar.pack(fill="x", pady=(0, 10))
 
-        # Logo centered in its own row
-        logo_row = tk.Frame(topbar, bg="white")
-        logo_row.pack(fill="x")
+        logo_counter_row = tk.Frame(topbar, bg="white")
+        logo_counter_row.pack(anchor="center")
+
+        # Logo on the left
         logo_path = os.path.join(os.path.dirname(__file__), "logo.png")
         if os.path.exists(logo_path):
             img = Image.open(logo_path)
             img.thumbnail((100, 100), Image.ANTIALIAS)
             self.logo_tk = ImageTk.PhotoImage(img)
-            tk.Label(logo_row, image=self.logo_tk, bg="white").pack(anchor="center")
+            tk.Label(logo_counter_row, image=self.logo_tk, bg="white").pack(side="left", padx=(0, 20))
 
-        # Counters (top right, in separate frame)
-        self.counter_frame = tk.Frame(topbar, bg="white")
-        self.counter_frame.pack(anchor="ne", side="right", padx=10)
+        # Counters to the right of the logo
+        self.counter_frame = tk.Frame(logo_counter_row, bg="white")
+        self.counter_frame.pack(side="left", anchor="n")
 
         self.accept_label = tk.Label(self.counter_frame, text="Accepted: 0", font=("Helvetica", 12), fg="green", bg="white")
         self.reject_label = tk.Label(self.counter_frame, text="Rejected: 0", font=("Helvetica", 12), fg="red", bg="white")
 
-        self.accept_label.pack(anchor="e")
-        self.reject_label.pack(anchor="e")
+        self.accept_label.pack(anchor="w")
+        self.reject_label.pack(anchor="w")
         
         self.start_btn = tk.Button(self.right, text="Start Inspection", command=self.start_inspection, bg="#4CAF50", fg="white", font=("Helvetica",12,"bold"), height=2)
 

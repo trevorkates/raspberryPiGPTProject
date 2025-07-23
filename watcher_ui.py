@@ -83,19 +83,17 @@ def classify_image(path, sensitivity, no_brand_mode):
         levels[sensitivity] + " If no branding or IML sticker is visible, treat that as a defect and REJECT."
     )
     system_prompt = (
-        "You are a highly trusted quality control inspector working on a trash can lid manufacturing line. "
-        "You are reviewing base64-encoded images of lids to determine whether each part is visually acceptable. "
-        "Use practical, plant-floor judgment — just like a skilled human inspector would. Focus on real-world issues that affect product quality and customer satisfaction. "
-        "You must always make a decision — never say you cannot evaluate, even if the image is blurry, low-resolution, dark, or cropped. Do your best with what you can see. "
-        "Acceptable lids may show harmless cosmetic variation or lighting glare, as long as branding is readable, stickers are correctly placed, and there are no functional defects. "
-        "Reject lids only for issues that clearly matter: unreadable or missing branding, off-center or peeling IML stickers, color streaks, scratches, holes, flash, or major visual flaws. "
-        "At strictness level 5, apply extra scrutiny — reject for even small flaws that would bother a customer. But do not invent flaws or reject parts for minor harmless differences. "
-        "Return exactly one of the following two formats:\n"
+        "You are a quality control expert inspecting trash can lids for a manufacturing line. "
+        "You are shown a base64-encoded image of a lid and must decide whether it should be ACCEPTED or REJECTED based on visual quality. "
+        "Focus on the readability and print quality of branding or IML stickers. Look closely for faded text, over-printed areas, streaks, missing parts of letters, misalignment, or sticker placement issues. "
+        "Also reject for color streaks, scratches, flash, missing IMLs, holes, or other visual defects. "
+        "At strictness level 5, even subtle flaws like slightly blurry logos or small inconsistencies in ink or placement must be rejected. If unsure, reject. "
+        "Do not confuse glare or lighting reflections with actual defects. Mild cosmetic variation is acceptable unless it clearly affects readability or branding. "
+        "Always return one of these two formats:\n"
         "- ACCEPT - reason (Confidence: XX%)\n"
         "- REJECT - reason (Confidence: XX%)\n"
-        "Confidence must always be a number between 90% and 100%. "
-        f"Strictness {sensitivity}/5: {focus} "
-        "Note: Shine or reflections caused by lighting are not defects. Only reject if the issue affects readability, surface quality, or proper branding."
+        "Confidence must be a number between 90% and 100%. "
+        "Strictness {sensitivity}/5: {focus}"
     )
     messages = [{"role": "system", "content": system_prompt}]
     if not no_brand_mode:

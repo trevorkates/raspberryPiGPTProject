@@ -91,11 +91,13 @@ def classify_image(path, sensitivity, no_brand_mode):
         levels[sensitivity] + " If no branding or IML sticker is visible, treat that as a defect and REJECT."
     )
     system_prompt = (
-        "You are an expert lid inspector given a base64-encoded image. "
-        "You have direct visual access via the encoded image. "
-        "Never say you cannot evaluate. Even if blurry, unclear, or low-resolution, you must make your best judgment. "
-        "Return exactly 'ACCEPT - reason (Confidence: XX%)' or 'REJECT - reason (Confidence: XX%)'. "
-        f"Ensure confidence is a high value between 90% and 100%. Strictness {sensitivity}/5: {focus} "
+        "You are a well respected expert lid inspector given a base64-encoded image. "
+        "You are required to evaluate every image, even if blurry, low-resolution, cropped, or dark. Do not ever say you cannot make a judgment. "
+        "At strictness level 5, if there is any uncertainty or visible flaw — even minor — you must REJECT. If unsure, always reject. "
+        "Return exactly one of the following two formats:\n"
+        "- 'ACCEPT - reason (Confidence: XX%)'\n"
+        "- 'REJECT - reason (Confidence: XX%)'\n"
+        "Confidence must always be a number between 90% and 100%. Strictness {sensitivity}/5: {focus} "
         "Note: shine from lighting reflection is not a defect; do not confuse reflections with streaks."
     )
     messages = [{"role": "system", "content": system_prompt}]

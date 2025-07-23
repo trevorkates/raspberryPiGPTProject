@@ -70,30 +70,25 @@ def clean_jpeg(path):
         return None
 
 def classify_image(path, sensitivity, no_brand_mode):
-    levels = {
-        1: "Accept nearly everything, even with obvious imperfections.",
-        2: "Accept mild streaks or small misprints. Reject only major flaws.",
-        3: "Balanced - Reject unclear or misaligned branding or IML.",
-        4: "Strict - Minor streaks or off-center prints may be REJECTED.",
-        5: "Very strict - Any defect should result in REJECT."
-    }
     focus = (
         "Focus solely on flash, surface quality, and color consistency. Ignore any branding or IML label."
         if no_brand_mode else
-        levels[sensitivity] + " If no branding or IML sticker is visible, treat that as a defect and REJECT."
+        f"Strictness level: {sensitivity}/5."
     )
     system_prompt = (
-        "You are a quality control expert inspecting trash can lids for a manufacturing line. "
-        "You are shown a base64-encoded image of a lid and must decide whether it should be ACCEPTED or REJECTED based on visual quality. "
-        "Focus on the readability and print quality of branding or IML stickers. Look closely for faded text, over-printed areas, streaks, missing parts of letters, misalignment, or sticker placement issues. "
-        "Also reject for color streaks, scratches, flash, missing IMLs, holes, or other visual defects. "
-        "At strictness level 5, even subtle flaws like slightly blurry logos or small inconsistencies in ink or placement must be rejected. If unsure, reject. "
-        "Do not confuse glare or lighting reflections with actual defects. Mild cosmetic variation is acceptable unless it clearly affects readability or branding. "
-        "Always return one of these two formats:\n"
+        "You are a visual quality inspector for plastic trash can lids. Each image contains a top-down view of a lid with branding or an IML sticker. "
+        "Your job is to ACCEPT or REJECT the lid based on visual quality. Always make a decision — do not say you cannot evaluate. "
+        "Focus on the clarity and print quality of the branding. Acceptable parts may use white text, even if contrast is low, as long as the letters are readable and not distorted, faded, or overprinted. "
+        "Only reject parts for real defects: unreadable or missing text, slanted or off-center stickers, visible print damage, streaks, holes, or scratches. Do not reject for lighting glare or reflections. "
+        "Be more lenient at lower strictness levels:\n"
+        "- At strictness 1–2: Accept minor print issues or cosmetic variation.\n"
+        "- At strictness 3: Be balanced. Accept if branding is readable and centered.\n"
+        "- At strictness 4–5: Apply stricter standards — reject for any text that's hard to read, off-center, or has visible flaws.\n"
+        "Your output must be exactly one of the following formats:\n"
         "- ACCEPT - reason (Confidence: XX%)\n"
         "- REJECT - reason (Confidence: XX%)\n"
-        "Confidence must be a number between 90% and 100%. "
-        "Strictness {sensitivity}/5: {focus}"
+        "Confidence must be between 90% and 100%. "
+        f"{focus}"
     )
     messages = [{"role": "system", "content": system_prompt}]
     if not no_brand_mode:

@@ -24,6 +24,15 @@ POLL_INTERVAL = 1.5 # seconds between folder checks
 
 accept_output = OutputDevice(19, active_high=True, initial_value=False)
 
+# strictness guidance for each level
+LEVEL_GUIDANCE = {
+    1: "Accept almost everything; only reject truly broken lids (massive print dropout, huge holes).",
+    2: "Accept minor print or placement issues; reject moderate flaws like small streaks or light scratches.",
+    3: "Balanced: readability and centering are key; reject if branding is blurry, misaligned, or partially missing.",
+    4: "Strict: reject even subtle ink inconsistencies, small misalignments, or any visible print defect.",
+    5: "Very strict: only perfect lids pass; reject for any minor imperfection."
+}
+
 REFERENCE_EXAMPLES = {
     "https://i.imgur.com/xXbGo0g.jpeg": "ACCEPT - Clean IML sticker, clear and centered branding.",
     "https://i.imgur.com/NDmSVPz.jpeg": "REJECT - White streaks are clearly visible in the print layer.",
@@ -70,25 +79,22 @@ def clean_jpeg(path):
         return None
 
 def classify_image(path, sensitivity, no_brand_mode):
-    focus = (
-        "Focus solely on flash, surface quality, and color consistency. Ignore any branding or IML label."
-        if no_brand_mode else
-        f"Strictness level: {sensitivity}/5."
-    )
+    # pick the text for this level, or override if no-brand mode
+    level_text = LEVEL_GUIDANCE[sensitivity]
+    if no_brand_mode:
+        focus = "Ignore branding—only evaluate surface quality and color consistency."
+    else:
+        focus = level_text
+
     system_prompt = (
-        "You are a visual quality inspector for plastic trash can lids. Each image contains a top-down view of a lid with branding or an IML sticker. "
-        "Your job is to ACCEPT or REJECT the lid based on visual quality. Always make a decision — do not say you cannot evaluate. "
-        "Focus on the clarity and print quality of the branding. Acceptable parts may use white text, even if contrast is low, as long as the letters are readable and not distorted, faded, or overprinted. "
-        "Only reject parts for real defects: unreadable or missing text, slanted or off-center stickers, visible print damage, streaks, holes, or scratches. Do not reject for lighting glare or reflections. "
-        "Be more lenient at lower strictness levels:\n"
-        "- At strictness 1–2: Accept minor print issues or cosmetic variation.\n"
-        "- At strictness 3: Be balanced. Accept if branding is readable and centered.\n"
-        "- At strictness 4–5: Apply stricter standards — reject for any text that's hard to read, off-center, or has visible flaws.\n"
-        "Your output must be exactly one of the following formats:\n"
+        "You are a factory QA inspector evaluating a top‑down image of a trash can lid. "
+        "Always choose ACCEPT or REJECT. Do not say you cannot evaluate. "
+        f"At strictness level {sensitivity}/5, you should: {focus} "
+        "Lighting glare and mild cosmetic variation are acceptable unless readability or branding is impacted. "
+        "Respond in exactly one format:\n"
         "- ACCEPT - reason (Confidence: XX%)\n"
         "- REJECT - reason (Confidence: XX%)\n"
-        "Confidence must be between 90% and 100%. "
-        f"{focus}"
+        "Confidence must be between 90% and 100%."
     )
     messages = [{"role": "system", "content": system_prompt}]
     if not no_brand_mode:
@@ -153,9 +159,19 @@ class LidInspectorApp:
         
         self.start_btn = tk.Button(self.right, text="Start Inspection", command=self.start_inspection, bg="#4CAF50", fg="white", font=("Helvetica",12,"bold"), height=2)
 
-        self.slider_lbl = tk.Label(self.right, text="Strictness (1–5):", bg="white", font=("Helvetica",14))
-        self.sensitivity_var = tk.IntVar(value=2)
-        self.sensitivity_spinbox = tk.Spinbox(self.right, from_=1, to=5, textvariable=self.sensitivity_var, font=("Helvetica",18), width=4, justify="center", command=lambda: self.display_image(force=True))
+        # Strictness selector (descriptive dropdown)
+        self.level_names = ["Lenient", "Relaxed", "Balanced", "Strict", "Very Strict"]
+        self.level_var = tk.StringVar(value=self.level_names[1])
+        self.sensitivity_var = tk.IntVar(value=2)  # still drive classify_image()
+
+        self.level_menu = tk.OptionMenu(
+            self.right,
+            self.level_var,
+            *self.level_names,
+            command=self.on_level_change
+        )
+        self.level_menu.config(font=("Helvetica",14))
+        self.level_menu.pack(pady=6, fill="x")
 
         self.no_brand_var = tk.BooleanVar(value=False)
         self.no_brand_cb = tk.Checkbutton(self.right, text="No Brand/IML Mode", variable=self.no_brand_var, bg="lightgrey", width=20, command=lambda: self.display_image(force=True))
@@ -260,6 +276,13 @@ class LidInspectorApp:
     def next_image(self):
         self.idx += 1
         self.display_image()
+
+    def on_level_change(self, choice):
+        # sync the numeric sensitivity to the dropdown
+        idx = self.level_names.index(choice)
+        self.sensitivity_var.set(idx + 1)
+        # force a refresh on current image
+        self.display_image(force=True)
 
     def clear_server(self):
         for fname in os.listdir(FOLDER_PATH):

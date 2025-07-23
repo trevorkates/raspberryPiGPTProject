@@ -20,7 +20,7 @@ load_dotenv("/home/keyence/inspector/.env")
 openai.api_key = os.getenv("OPENAI_API_KEY")
 
 FOLDER_PATH   = "/home/keyence/iv3_images"
-POLL_INTERVAL = 2.5 # seconds between folder checks
+POLL_INTERVAL = 1.5 # seconds between folder checks
 
 # GPIO pin for ACCEPT signal
 accept_output = OutputDevice(19, active_high=True, initial_value=False)
@@ -52,10 +52,18 @@ def list_images():
     )
 
 def is_file_stable(path, wait_time=1.0):
-    size1 = os.path.getsize(path)
     time.sleep(wait_time)
-    size2 = os.path.getsize(path)
-    return size1 == size2
+    # Confirm file hasn't changed in size AND was modified more than `wait_time` ago
+    try:
+        size = os.path.getsize(path)
+        time.sleep(0.5)
+        new_size = os.path.getsize(path)
+        mtime = os.path.getmtime(path)
+        if size == new_size and (time.time() - mtime) > wait_time:
+            return True
+    except FileNotFoundError:
+        return False
+    return False
 
 def clean_jpeg(path):
     try:

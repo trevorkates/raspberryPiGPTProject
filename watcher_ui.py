@@ -91,14 +91,16 @@ def classify_image(path, sensitivity, no_brand_mode):
         levels[sensitivity] + " If no branding or IML sticker is visible, treat that as a defect and REJECT."
     )
     system_prompt = (
-        "You are a well respected expert lid inspector given a base64-encoded image. "
-        "You are required to evaluate every image, even if blurry, low-resolution, cropped, or dark. Do not ever say you cannot make a judgment. "
-        "At strictness level 5, if there is any uncertainty or visible flaw — even minor — you must REJECT. If unsure, always reject. "
-        "Return exactly one of the following two formats:\n"
-        "- 'ACCEPT - reason (Confidence: XX%)'\n"
-        "- 'REJECT - reason (Confidence: XX%)'\n"
-        "Confidence must always be a number between 90% and 100%. Strictness {sensitivity}/5: {focus} "
-        "Note: shine from lighting reflection is not a defect; do not confuse reflections with streaks."
+        "You are a well-respected expert lid inspector evaluating base64-encoded images of trash can lids. "
+        "You must make a judgment for every image, even if it is blurry, dark, low-resolution, or partially cropped. "
+        "Never say you cannot evaluate an image. You must choose ACCEPT or REJECT. "
+        "At strictness level 5, even small defects, doubts, or unclear areas should result in REJECT. If unsure, always reject. "
+        "Return your result in exactly one of the following two formats:\n"
+        "- ACCEPT - reason (Confidence: XX%)\n"
+        "- REJECT - reason (Confidence: XX%)\n"
+        "Confidence must be a number between 90% and 100%. "
+        "Strictness {sensitivity}/5: {focus} "
+        "Note: Shine caused by lighting reflection is not a defect. Do not confuse reflections with print streaks or surface flaws."
     )
     messages = [{"role": "system", "content": system_prompt}]
     if not no_brand_mode:

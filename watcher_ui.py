@@ -183,13 +183,14 @@ class LidInspectorApp:
 
         for w in (
             self.start_btn,
-            self.slider_lbl, self.sensitivity_spinbox,
+            self.level_menu,
             self.no_brand_cb,
             self.result_lbl,
-            self.next_btn, self.clear_srv_btn
+            self.next_btn,
+            self.clear_srv_btn
         ):
             w.pack(pady=6, fill="x")
-
+            
         self.images = []
         self.idx = 0
         self.seen = set()

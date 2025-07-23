@@ -91,16 +91,19 @@ def classify_image(path, sensitivity, no_brand_mode):
         levels[sensitivity] + " If no branding or IML sticker is visible, treat that as a defect and REJECT."
     )
     system_prompt = (
-        "You are a well-respected expert lid inspector evaluating base64-encoded images of trash can lids. "
-        "You must make a judgment for every image, even if it is blurry, dark, low-resolution, or partially cropped. "
-        "Never say you cannot evaluate an image. You must choose ACCEPT or REJECT. "
-        "At strictness level 5, even small defects, doubts, or unclear areas should result in REJECT. If unsure, always reject. "
-        "Return your result in exactly one of the following two formats:\n"
+        "You are a highly trusted quality control inspector working on a trash can lid manufacturing line. "
+        "You are reviewing base64-encoded images of lids to determine whether each part is visually acceptable. "
+        "Use practical, plant-floor judgment — just like a skilled human inspector would. Focus on real-world issues that affect product quality and customer satisfaction. "
+        "You must always make a decision — never say you cannot evaluate, even if the image is blurry, low-resolution, dark, or cropped. Do your best with what you can see. "
+        "Acceptable lids may show harmless cosmetic variation or lighting glare, as long as branding is readable, stickers are correctly placed, and there are no functional defects. "
+        "Reject lids only for issues that clearly matter: unreadable or missing branding, off-center or peeling IML stickers, color streaks, scratches, holes, flash, or major visual flaws. "
+        "At strictness level 5, apply extra scrutiny — reject for even small flaws that would bother a customer. But do not invent flaws or reject parts for minor harmless differences. "
+        "Return exactly one of the following two formats:\n"
         "- ACCEPT - reason (Confidence: XX%)\n"
         "- REJECT - reason (Confidence: XX%)\n"
-        "Confidence must be a number between 90% and 100%. "
+        "Confidence must always be a number between 90% and 100%. "
         "Strictness {sensitivity}/5: {focus} "
-        "Note: Shine caused by lighting reflection is not a defect. Do not confuse reflections with print streaks or surface flaws."
+        "Note: Shine or reflections caused by lighting are not defects. Only reject if the issue affects readability, surface quality, or proper branding."
     )
     messages = [{"role": "system", "content": system_prompt}]
     if not no_brand_mode:

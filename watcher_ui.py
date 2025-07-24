@@ -94,6 +94,7 @@ def classify_image(path, sensitivity, no_brand_mode):
         "surface scratches, dents, misaligned IML or branding, faded or over‑inked text, holes, or color streaks. "
         f"At strictness level {sensitivity}/5, apply this: {focus} "
         "Lighting glare and minor cosmetic variation are acceptable only if they do not obscure branding or structural defects. "
+        "White streaks, especially on dark or black areas, should be interpreted as lighting glare unless proven otherwise—focus on indentations, raised edges, scratches, and other true surface deformities. "
         "Then choose exactly one of these, with no asterisks or markdown:\n"
         "- ACCEPT - reason (Confidence: XX%)\n"
         "- REJECT - reason (Confidence: XX%)"

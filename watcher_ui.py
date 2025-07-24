@@ -1,4 +1,3 @@
-#last one that really worked 12pm
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
@@ -53,7 +52,6 @@ def start_modbus_server():
 
 threading.Thread(target=start_modbus_server, daemon=True).start()
 
-
 # --- APPLICATION --------------------------------------------------
 class InspectorApp:
     def __init__(self, root):
@@ -62,7 +60,7 @@ class InspectorApp:
         root.geometry("800x600")
         root.configure(bg="white")
 
-        # Container frames
+        # Layout frames
         container = tk.Frame(root, bg="white")
         container.pack(fill="both", expand=True, padx=10, pady=10)
         self.left = tk.Frame(container, bg="white", width=400, height=600)
@@ -152,10 +150,19 @@ class InspectorApp:
         except:
             return False
 
+    def _sort_files(self, files):
+        """Filter image files and sort numerically if possible."""
+        imgs = [f for f in files if f.lower().endswith(('.jpg','.jpeg','.png'))]
+        def key(f):
+            name = os.path.splitext(f)[0]
+            return int(name) if name.isdigit() else float('inf')
+        return sorted(imgs, key=key)
+
     def _worker(self):
         while True:
             try:
-                for fname in sorted(os.listdir(FOLDER_PATH), key=lambda f: int(os.path.splitext(f)[0])):
+                all_files = os.listdir(FOLDER_PATH)
+                for fname in self._sort_files(all_files):
                     if fname in self._processed:
                         continue
                     path = os.path.join(FOLDER_PATH, fname)
@@ -172,19 +179,16 @@ class InspectorApp:
 
     def _process_file(self, path):
         self.root.after(0, lambda p=path: self._display_image(p))
-        # Get UI parameters
         lvl = self.sensitivity_var.get()
         no_brand = self.no_brand_var.get()
         result, detail = self._analyze_image(path, lvl, no_brand)
         self.root.after(0, lambda r=result, d=detail: self._update_result(r, d))
-        # Update counters
         if result == "ACCEPT":
             self.accept_count += 1
             self.accept_label.config(text=f"Accepted: {self.accept_count}")
         else:
             self.reject_count += 1
             self.reject_label.config(text=f"Rejected: {self.reject_count}")
-        # Send Modbus coil
         coil_val = 1 if result == "ACCEPT" else 0
         modbus_ctx[0].setValues(1, COIL_ADDRESS, [coil_val])
 
@@ -204,35 +208,26 @@ class InspectorApp:
 
     def _analyze_image(self, path, sensitivity, no_brand):
         try:
-            # Read and encode
             with open(path, "rb") as f:
                 img_bytes = f.read()
             b64 = base64.b64encode(img_bytes).decode()
             data_uri = f"data:image/jpeg;base64,{b64}"
-
-            # Build prompt
-            if no_brand:
-                focus = "Ignore branding—only evaluate surface quality and color consistency."
-            else:
-                focus = LEVEL_GUIDANCE.get(sensitivity, LEVEL_GUIDANCE[3])
-
+            focus = ("Ignore branding—only evaluate surface quality and color consistency."
+                     if no_brand else LEVEL_GUIDANCE.get(sensitivity, LEVEL_GUIDANCE[3]))
             system_prompt = (
-                "You are a veteran factory QA inspector examining a single top-down photo of a plastic trash-can lid. "
+                "You are a veteran factory QA inspector examining a top-down photo of a trash-can lid. "
                 f"At strictness level {sensitivity}/5, apply this: {focus} "
-                "Then respond with exactly 'ACCEPT - reason (Confidence: XX%)' or 'REJECT - reason (Confidence: XX%)'."
+                "Respond with 'ACCEPT - reason (Confidence: XX%)' or 'REJECT - reason (Confidence: XX%)'."
             )
             messages = [{"role":"system","content":system_prompt}]
             if not no_brand:
                 for url, ex in REFERENCE_EXAMPLES.items():
                     messages.append({"role":"user","content":f"{ex} Image: {url}"})
             messages.append({"role":"user","content":"Here is the image to inspect: " + data_uri})
-
             resp = openai.ChatCompletion.create(model=MODEL_NAME, messages=messages)
             text = resp.choices[0].message.content.strip()
             parts = text.split(" ", 1)
-            result = parts[0].upper()
-            detail = parts[1] if len(parts)>1 else ""
-            return result, detail
+            return parts[0].upper(), parts[1] if len(parts)>1 else ""
         except Exception as e:
             print("Analysis error:", e)
             return "ERROR", str(e)

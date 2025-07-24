@@ -24,10 +24,10 @@ POLL_INTERVAL = 1.5  # seconds between folder checks
 
 accept_output = OutputDevice(19, active_high=True, initial_value=False)
 
-# strictness guidance for each level
+# strictness guidance for each level - tightened lenient and relaxed
 LEVEL_GUIDANCE = {
-    1: "Accept almost everything; only reject truly broken lids (massive print dropout, huge holes).",
-    2: "Accept minor print or placement issues; reject moderate flaws like small streaks or light scratches.",
+    1: "Accept everything except clear defects such as holes, large cracks, or missing material; ignore glare completely.",
+    2: "Focus on true surface deformities: reject scratches, dents, or streaks; ignore reflective glare entirely.",
     3: "Balanced: readability and centering are key; reject if branding is blurry, misaligned, or partially missing.",
     4: "Strict: reject even subtle ink inconsistencies, small misalignments, or any visible print defect.",
     5: "Very strict: only perfect lids pass; reject for any minor imperfection."
@@ -35,7 +35,7 @@ LEVEL_GUIDANCE = {
 
 REFERENCE_EXAMPLES = {
     "https://i.imgur.com/xXbGo0g.jpeg": "ACCEPT - Clean IML sticker, clear and centered branding.",
-    "https://i.imgur.com/NDmSVPz.jpeg": "REJECT - White streaks are clearly visible in the print layer.",
+    "https://i.imgur.com/NDmSVPz.jpeg": "REJECT - White streaks are simply reflections, not defects.",
     "https://i.imgur.com/12zH9va.jpeg": "ACCEPT - Shine is due to lighting reflection, not a defect."
 }
 
@@ -89,15 +89,14 @@ def classify_image(path, sensitivity, no_brand_mode):
         focus = level_text
 
     system_prompt = (
-        "You are a veteran factory QA inspector examining a single top‑down photo of a plastic trash‑can lid. "
-        "Treat this image as if you held it in your hand: look for hidden mold flash, raised burrs, sink marks, "
-        "surface scratches, dents, misaligned IML or branding, faded or over‑inked text, holes, or color streaks. "
-        f"At strictness level {sensitivity}/5, apply this: {focus} "
-        "Lighting glare and minor cosmetic variation are acceptable only if they do not obscure branding or structural defects. "
-        "White streaks, especially on dark or black areas, should be interpreted as lighting glare unless proven otherwise—focus on indentations, raised edges, scratches, and other true surface deformities. "
-        "Then choose exactly one of these, with no asterisks or markdown:\n"
-        "- ACCEPT - reason (Confidence: XX%)\n"
-        "- REJECT - reason (Confidence: XX%)"
+        "You are an expert factory QA inspector assessing a top-down image of a plastic trash-can lid. "
+        "Your primary goal is to identify true surface defects—scratches, dents, raised burrs, sink marks, or misaligned IML. "
+        f"At strictness level {sensitivity}/5, apply this guidance: {focus} "
+        "Completely disregard lighting glare, especially white streaks on dark or black areas—they are reflections, not defects. "
+        "Do not mention glare; focus your judgement solely on physical deformities or printing faults. "
+        "Respond with exactly one choice, formatted without markdown or bullets:\n"
+        "ACCEPT - reason (Confidence: XX%)\n"
+        "REJECT - reason (Confidence: XX%)"
     )
 
     messages = [{"role": "system", "content": system_prompt}]

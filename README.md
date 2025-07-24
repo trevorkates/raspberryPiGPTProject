@@ -1,4 +1,5 @@
 # Lid Inspector
+Summer 2025 internship project that uses a vision camera, raspberry pi 3, and chat gpt-4o api to perform quality inspections on 35 gallon trash can lids.
 
 ## Overview
 Watched folder: `/home/keyence/iv3_images`  

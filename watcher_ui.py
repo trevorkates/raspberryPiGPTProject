@@ -87,15 +87,18 @@ def classify_image(path, sensitivity, no_brand_mode):
         focus = level_text
 
     system_prompt = (
-        "You are a factory QA inspector evaluating a top‑down image of a trash can lid. "
-        "Always choose ACCEPT or REJECT. Do not say you cannot evaluate. "
-        f"At strictness level {sensitivity}/5, you should: {focus} "
-        "Lighting glare and mild cosmetic variation are acceptable unless readability or branding is impacted. "
-        "Respond in exactly one format:\n"
+        "You are a factory QA inspector evaluating a plastic trash‑can lid.  "
+        "You will be given two images in one request: first a narrow crop of the mold seam, then the full lid view.  "
+        f"At strictness level {sensitivity}/5, apply this guidance: {focus}  "
+        "Step 1: Inspect the seam crop for flash, burrs, sink marks, or raised ejector-pin blemishes.  "
+        "Step 2: Examine the full lid for scratches, dents, misaligned IML, missing text, or color streaks.  "
+        "Lighting glare and mild cosmetic variation are acceptable unless they obscure branding or structural defects.  "
+        "Then decide **exactly one** of:\n"
         "- ACCEPT - reason (Confidence: XX%)\n"
         "- REJECT - reason (Confidence: XX%)\n"
-        "Confidence must be between 90% and 100%."
+        "Do not say you cannot evaluate. Confidence must be between 90% and 100%."
     )
+
     messages = [{"role": "system", "content": system_prompt}]
     if not no_brand_mode:
         for url, example in REFERENCE_EXAMPLES.items():

@@ -146,7 +146,7 @@ class LidInspectorApp:
         logo_path = os.path.join(os.path.dirname(__file__), "logo.png")
         if os.path.exists(logo_path):
             img = Image.open(logo_path)
-            img.thumbnail((100, 100), Image.Resampling.LANCZOS)
+            img.thumbnail((100, 100), Image.ANTIALIAS)
             self.logo_tk = ImageTk.PhotoImage(img)
             tk.Label(logo_counter_row, image=self.logo_tk, bg="white").pack(side="left", padx=(0, 20))
 
@@ -222,7 +222,7 @@ class LidInspectorApp:
 
         try:
             img = Image.open(path)
-            img.thumbnail((400, 300), Image.Resampling.LANCZOS)
+            img.thumbnail((400, 300), Image.ANTIALIAS)
             self.tkimg = ImageTk.PhotoImage(img)
             self.image_label.config(image=self.tkimg)
             self.result_lbl.config(text="", fg="black")

@@ -115,7 +115,7 @@ def classify_image(path, sensitivity, no_brand_mode):
     if not b64:
         return "ERROR: cleanup failed"
     messages.append({"role":"user","content":f"Now evaluate this image:\n![](data:image/jpeg;base64,{b64})"})
-    resp = openai.ChatCompletion.create(model="gpt-4o-mini", messages=messages)
+    resp = openai.ChatCompletion.create(model="gpt-4o", messages=messages)
     return resp.choices[0].message.content.strip()
 
 # --- MAIN APPLICATION CLASS ----------------------------------------

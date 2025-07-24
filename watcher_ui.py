@@ -23,8 +23,10 @@ openai.api_key = os.getenv("OPENAI_API_KEY")
 if not openai.api_key:
     raise RuntimeError("Missing OPENAI_API_KEY")
 
-FOLDER_PATH   = "/home/keyence/iv3_images"
-POLL_INTERVAL = 3  # seconds between folder scans
+# Paths and network
+BASE_DIR     = os.path.dirname(os.path.abspath(__file__))
+FOLDER_PATH  = "/home/keyence/iv3_images"
+POLL_INTERVAL = 5  # seconds between folder scans
 COIL_ADDRESS  = 1  # Modbus coil address for ACCEPT/REJECT signal
 MODEL_NAME    = "gpt-4o-mini"
 
@@ -55,9 +57,8 @@ def start_modbus_server():
 
 threading.Thread(target=start_modbus_server, daemon=True).start()
 
-# --- GLARE REMOVAL FUNCTION ----------------------------------------
+# --- GLARE REMOVAL -------------------------------------------------
 def remove_glare(path):
-    """Remove specular highlights using OpenCV inpainting."""
     img_bgr = cv2.imread(path)
     if img_bgr is None:
         raise FileNotFoundError(f"Cannot read image: {path}")
@@ -70,7 +71,7 @@ def remove_glare(path):
     img_rgb = cv2.cvtColor(inpainted, cv2.COLOR_BGR2RGB)
     return Image.fromarray(img_rgb)
 
-# --- APPLICATION --------------------------------------------------
+# --- APPLICATION ---------------------------------------------------
 class InspectorApp:
     def __init__(self, root):
         self.root = root
@@ -86,7 +87,7 @@ class InspectorApp:
         self.accept_count = 0
         self.reject_count = 0
 
-        # Layout frames
+        # Layout
         container = tk.Frame(root, bg="white")
         container.pack(fill="both", expand=True, padx=10, pady=10)
         self.left = tk.Frame(container, bg="white", width=400, height=600)
@@ -96,20 +97,21 @@ class InspectorApp:
         self.left.pack_propagate(False)
         self.right.pack_propagate(False)
 
-        # Image display
+        # Image area
         self.image_label = tk.Label(self.left, bg="white")
         self.image_label.pack(fill="both", expand=True, padx=5, pady=5)
-        # Toggle button
         self.toggle_btn = tk.Button(self.left, text="Show Cleaned", command=self._toggle_view)
         self.toggle_btn.pack(pady=5)
 
-        # Top bar with logo and counters
+        # Topbar: logo + counters
         topbar = tk.Frame(self.right, bg="white")
         topbar.pack(fill="x", pady=(0,10))
-        if os.path.exists("logo.png"):
-            img = Image.open("logo.png"); img.thumbnail((100,100))
-            self.logo_img = ImageTk.PhotoImage(img)
-            tk.Label(topbar, image=self.logo_img, bg="white").pack(side="left", padx=(0,20))
+        logo_path = os.path.join(BASE_DIR, "logo.png")
+        if os.path.exists(logo_path):
+            logo_img = Image.open(logo_path)
+            logo_img.thumbnail((100,100))
+            self.logo_tk = ImageTk.PhotoImage(logo_img)
+            tk.Label(topbar, image=self.logo_tk, bg="white").pack(side="left", padx=(0,20))
         cnt_frame = tk.Frame(topbar, bg="white")
         cnt_frame.pack(side="left")
         self.accept_label = tk.Label(cnt_frame, text="Accepted: 0", font=("Helvetica",12), fg="green", bg="white")
@@ -117,7 +119,7 @@ class InspectorApp:
         self.accept_label.pack()
         self.reject_label.pack()
 
-        # Controls: strictness and no-brand
+        # Controls: strictness & no-brand
         tk.Label(self.right, text="Strictness:", bg="white", font=("Helvetica",12)).pack(pady=(10,0), fill="x")
         self.sensitivity_var = tk.IntVar(value=3)
         self.level_menu = tk.OptionMenu(self.right, self.sensitivity_var, *[1,2,3,4,5])
@@ -126,7 +128,7 @@ class InspectorApp:
         tk.Checkbutton(self.right, text="No IML/Brand Mode", variable=self.no_brand_var,
                        bg="white").pack(pady=5, fill="x")
 
-        # Results display
+        # Result display
         self.result_lbl = tk.Label(self.right, text="Waiting for images...", font=("Helvetica",14),
                                    wraplength=260, justify="left", bg="white")
         self.result_lbl.pack(pady=5, fill="x")
@@ -134,22 +136,20 @@ class InspectorApp:
                                    wraplength=260, justify="left", bg="white")
         self.detail_lbl.pack(pady=5, fill="x")
 
-        # Clear server button
+        # Clear server
         tk.Button(self.right, text="Clear Server Photos", command=self.clear_server,
                   bg="white").pack(pady=10, fill="x")
 
-        # Start worker
+        # Start background worker
         threading.Thread(target=self._worker, daemon=True).start()
 
     def _toggle_view(self):
-        """Toggle between raw and cleaned display of current image."""
         self.show_cleaned = not self.show_cleaned
         if self.current_path:
             self._display_image(self.current_path)
         self.toggle_btn.config(text="Show Raw" if self.show_cleaned else "Show Cleaned")
 
     def clear_server(self):
-        """Reset state and UI."""
         self._processed.clear()
         with self._queue.mutex:
             self._queue.queue.clear()
@@ -158,6 +158,13 @@ class InspectorApp:
         self.reject_label.config(text="Rejected: 0")
         self.result_lbl.config(text="Waiting for images...", fg="black")
         self.detail_lbl.config(text="")
+
+    def _sort_key(self, fname):
+        name, _ = os.path.splitext(fname)
+        try:
+            return int(name)
+        except ValueError:
+            return float('inf')  # non-numeric names go last
 
     def _is_file_stable(self, path, wait=1.0):
         try:
@@ -170,8 +177,11 @@ class InspectorApp:
     def _worker(self):
         while True:
             try:
-                for fname in sorted(os.listdir(FOLDER_PATH), key=lambda f: int(os.path.splitext(f)[0])):
-                    if fname in self._processed: continue
+                all_files = [f for f in os.listdir(FOLDER_PATH)
+                             if f.lower().endswith(('.jpg','.jpeg','.png'))]
+                for fname in sorted(all_files, key=self._sort_key):
+                    if fname in self._processed:
+                        continue
                     path = os.path.join(FOLDER_PATH, fname)
                     if self._is_file_stable(path):
                         self._queue.put(path)
@@ -186,7 +196,6 @@ class InspectorApp:
 
     def _process_file(self, path):
         self.current_path = path
-        # display raw or cleaned based on toggle
         self.root.after(0, lambda p=path: self._display_image(p))
         lvl = self.sensitivity_var.get()
         no_brand = self.no_brand_var.get()
@@ -198,7 +207,7 @@ class InspectorApp:
         else:
             self.reject_count += 1
             self.reject_label.config(text=f"Rejected: {self.reject_count}")
-        coil_val = 1 if result=="ACCEPT" else 0
+        coil_val = 1 if result == "ACCEPT" else 0
         modbus_ctx[0].setValues(1, COIL_ADDRESS, [coil_val])
 
     def _display_image(self, path):
@@ -214,13 +223,12 @@ class InspectorApp:
             print("Display error:", e)
 
     def _update_result(self, result, detail):
-        color = "green" if result=="ACCEPT" else "red"
+        color = "green" if result == "ACCEPT" else "red"
         self.result_lbl.config(text=result, fg=color)
         self.detail_lbl.config(text=detail)
 
     def _analyze_image(self, path, sensitivity, no_brand):
         try:
-            # Read and optionally preprocess for glare
             cleaned = remove_glare(path)
             buf = io.BytesIO()
             cleaned.save(buf, format="JPEG")
@@ -228,7 +236,6 @@ class InspectorApp:
             b64 = base64.b64encode(img_bytes).decode()
             data_uri = f"data:image/jpeg;base64,{b64}"
 
-            # Build prompt with glare ignore
             glare_text = "Ignore any small specular highlights from lighting glare."
             if no_brand:
                 focus = glare_text + " Ignore branding—only evaluate surface quality and color consistency."
@@ -249,9 +256,9 @@ class InspectorApp:
 
             resp = openai.ChatCompletion.create(model=MODEL_NAME, messages=messages)
             text = resp.choices[0].message.content.strip()
-            parts = text.split(" ",1)
+            parts = text.split(" ", 1)
             result = parts[0].upper()
-            detail = parts[1] if len(parts)>1 else ""
+            detail = parts[1] if len(parts) > 1 else ""
             return result, detail
         except Exception as e:
             print("Analysis error:", e)

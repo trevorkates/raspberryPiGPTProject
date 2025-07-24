@@ -39,6 +39,15 @@ REFERENCE_EXAMPLES = {
     "https://i.imgur.com/12zH9va.jpeg": "ACCEPT - Shine is due to lighting reflection, not a defect."
 }
 
+# no-brand/IML mode few‑shot examples (surface defect focus)
+NO_BRAND_EXAMPLES = {
+    "https://i.imgur.com/yTdcIcy.jpeg": "REJECT - raised burr on surface.",
+    "https://i.imgur.com/yTdcIcy.jpeg": "REJECT - flash along back edge.",
+    "https://i.imgur.com/hNf4OZP.jpeg": "ACCEPT - Smooth surface with no flash, burrs, or visible defects."
+}
+
+
+
 store = ModbusSlaveContext(di=ModbusSequentialDataBlock(0, [0, 0]))
 modbus_ctx = ModbusServerContext(slaves=store, single=True)
 
@@ -80,9 +89,14 @@ def clean_jpeg(path):
 
 def classify_image(path, sensitivity, no_brand_mode):
     # pick the text for this level, or override if no-brand mode
+        # pick the text for this level, or override if no-brand mode
     level_text = LEVEL_GUIDANCE[sensitivity]
     if no_brand_mode:
-        focus = "Ignore branding—only evaluate surface quality and color consistency."
+        focus = (
+            "Ignore branding and text entirely. "
+            "Evaluate only surface quality: identify flash (excess plastic along mold seams), burrs, sink marks, scratches, dents, holes, or color inconsistency. "
+            "Reject any defect that affects the part’s form, function, or appearance."
+        )
     else:
         focus = level_text
 
@@ -101,6 +115,12 @@ def classify_image(path, sensitivity, no_brand_mode):
         for url, example in REFERENCE_EXAMPLES.items():
             messages.append({"role": "user", "content": f"{example} Image: {url}"})
     b64 = clean_jpeg(path)
+    if no_brand_mode:
+        for url, example in NO_BRAND_EXAMPLES.items():
+            messages.append({
+                "role": "user",
+                "content": f"{example} Image: {url}"
+            })
     if not b64:
         return "Error: Unable to clean and encode JPEG."
     messages.append({

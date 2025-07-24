@@ -23,7 +23,8 @@ from pymodbus.datastore import ModbusSlaveContext, ModbusServerContext, ModbusSe
 parser = argparse.ArgumentParser(description="Trash-Lid Inspector UI")
 parser.add_argument("--folder",      default="/home/keyence/iv3_images")
 parser.add_argument("--poll-int",    type=float, default=1.5)
-parser.add_argument("--modbus-port", type=int,   default=1502)
+# Switch default back to 502 so UR10 can connect without port override
+parser.add_argument("--modbus-port", type=int,   default=502)
 parser.add_argument("--accept-pin",  type=int,   default=19)
 parser.add_argument("--reject-pin",  type=int,   default=20)
 args = parser.parse_args()
@@ -32,8 +33,7 @@ FOLDER_PATH   = args.folder
 POLL_INTERVAL = args.poll_int
 MODBUS_PORT   = args.modbus_port
 
-# Load & verify OpenAI key
-load_dotenv("/home/keyence/inspector/.env")
+# Load & verify OpenAI key\load_dotenv("/home/keyence/inspector/.env")
 openai.api_key = os.getenv("OPENAI_API_KEY")
 if not openai.api_key:
     raise RuntimeError("Missing OPENAI_API_KEY — please set it in your .env")
@@ -94,10 +94,7 @@ def clean_jpeg(path):
 
 def classify_image(path, sensitivity, no_brand_mode):
     level_text = LEVEL_GUIDANCE[sensitivity]
-    if no_brand_mode:
-        focus = "Ignore branding—only evaluate surface quality and color consistency."
-    else:
-        focus = level_text
+    focus = ("Ignore branding—only evaluate surface quality and color consistency." if no_brand_mode else level_text)
 
     system_prompt = (
         "You are a veteran factory QA inspector examining a single top-down photo of a plastic trash-can lid.  "
@@ -109,19 +106,14 @@ def classify_image(path, sensitivity, no_brand_mode):
         "- REJECT - reason (Confidence: XX%)\n"
         "Do not say you cannot evaluate. Confidence must be between 90% and 100%."
     )
-    messages = [{"role": "system", "content": system_prompt}]
+    messages = [{"role":"system","content":system_prompt}]
     if not no_brand_mode:
         for url, example in REFERENCE_EXAMPLES.items():
-            messages.append({"role": "user", "content": f"{example} Image: {url}"})
-
+            messages.append({"role":"user","content":f"{example} Image: {url}"})
     b64 = clean_jpeg(path)
     if not b64:
         return "ERROR: cleanup failed"
-    # embed image in markdown
-    messages.append({
-        "role": "user",
-        "content": f"Now evaluate this image:\n![](data:image/jpeg;base64,{b64})"
-    })
+    messages.append({"role":"user","content":f"Now evaluate this image:\n![](data:image/jpeg;base64,{b64})"})
     resp = openai.ChatCompletion.create(model="gpt-4o-mini", messages=messages)
     return resp.choices[0].message.content.strip()
 
@@ -160,7 +152,7 @@ class LidInspectorApp:
         # Logo
         logo_path = os.path.join(os.path.dirname(__file__), "logo.png")
         if os.path.exists(logo_path):
-            img = Image.open(logo_path);
+            img = Image.open(logo_path)
             img.thumbnail((100,100), Image.ANTIALIAS)
             self.logo_tk = ImageTk.PhotoImage(img)
             tk.Label(row, image=self.logo_tk, bg="white").pack(side="left", padx=(0,20))
@@ -203,6 +195,9 @@ class LidInspectorApp:
         # Hardware outputs
         self.accept_output = OutputDevice(args.accept_pin, active_high=True, initial_value=False)
         self.reject_output = OutputDevice(args.reject_pin, active_high=True, initial_value=False)
+
+        # Auto-start inspection so images load immediately
+        self.start_inspection()
 
     def wait_for_stable(self, path, interval=1.0, retries=3):
         last = -1

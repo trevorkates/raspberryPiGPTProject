@@ -33,7 +33,8 @@ FOLDER_PATH   = args.folder
 POLL_INTERVAL = args.poll_int
 MODBUS_PORT   = args.modbus_port
 
-# Load & verify OpenAI key\load_dotenv("/home/keyence/inspector/.env")
+# Load & verify OpenAI key
+load_dotenv("/home/keyence/inspector/.env")
 openai.api_key = os.getenv("OPENAI_API_KEY")
 if not openai.api_key:
     raise RuntimeError("Missing OPENAI_API_KEY — please set it in your .env")

@@ -27,10 +27,10 @@ accept_output = OutputDevice(19, active_high=True, initial_value=False)
 # strictness guidance for each level - tightened lenient and relaxed
 LEVEL_GUIDANCE = {
     1: "Reject only critical issues like holes, large cracks, short shots, or missing material. All other cosmetic defects are acceptable. Glare should be ignored.",
-    2: "Reject physical deformities like dents, deep scratches, or flash that affects handling. Accept minor print variation or smudges. Glare and minor scuffs are not defects.",
-    3: "Reject anything that affects brand readability, IML alignment, or causes visible inconsistency (e.g. faded hot stamps, off-center labels, peeling stickers, flash on handles).",
-    4: "Reject any defect visible from 3 feet away including over- or under-branded stamps, misaligned or flaking labels, pitting, contamination, color streaking, or surface warping.",
-    5: "Only perfectly molded and labeled parts are acceptable. Reject any surface blemish, flash, streak, label imperfection, or branding defect—even subtle ones."
+    2: "Reject physical deformities like dents, deep scratches, or flash that affects handling or safety. Accept minor print variation, faint scuffs, or slight discoloration. Glare is not a defect.",
+    3: "Balanced: Labels and branding must be readable from 3 feet and generally well-positioned. Accept minor surface variation, color streaks, or small label shifts as long as they do not affect function or brand legibility.",
+    4: "Reject any defect clearly visible from 3 feet, including over- or under-branded hot stamps, misaligned or flaking labels, pitting, contamination, color streaking, flash, or warping.",
+    5: "Only perfectly molded and labeled parts are acceptable. Reject any surface blemish, flash, streak, label imperfection, or branding defect—even if subtle."
 }
 
 REFERENCE_EXAMPLES = {
@@ -84,7 +84,11 @@ def classify_image(path, sensitivity, no_brand_mode):
     # level guidance or override
     level_text = LEVEL_GUIDANCE.get(sensitivity, LEVEL_GUIDANCE[3])
     if no_brand_mode:
-        focus = "Ignore branding—only evaluate surface quality and color consistency."
+        focus = (
+            "Use common sense: pass parts with small visual imperfections if they don’t affect use or brand image. "
+            "Reject only if the issue is clearly visible or would cause confusion, damage, or rejection by a customer."
+        )
+
     else:
         focus = level_text
 
@@ -98,6 +102,8 @@ def classify_image(path, sensitivity, no_brand_mode):
         "- SHORT SHOT: Reject any sign of incomplete mold filling (visible gaps, thin areas, holes).\n"
         "- AESTHETICS: Reject for heavy streaking, color variation, warping, or pitting if visible from 3 feet. Surface should be clean, smooth, and consistent.\n"
         "- EXTERNAL INFLUENCE: Reject if contaminated with grease, dirt, or other foreign material.\n"
+        "Pass the part if it meets functional and visual expectations: if branding is readable, labels are intact and straight, there is no sharp flash, and surfaces are generally clean and uniform." 
+        "Acceptable parts may show minor handling marks or material variation as long as they don’t impact function or brand visibility."
         f"At strictness level {sensitivity}/5, apply this guidance: {focus} "
         "Ignore lighting glare, especially white streaks on dark surfaces—they are not defects. "
         "Do not mention glare in your evaluation. "

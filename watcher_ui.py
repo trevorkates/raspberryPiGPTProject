@@ -104,7 +104,7 @@ def classify_image(path, sensitivity, no_brand_mode):
         "Respond with exactly one choice, formatted like this (no extra text):\n"
         "ACCEPT - reason (Confidence: XX%)\n"
         "REJECT - reason (Confidence: XX%)"
-)
+    )
 
     messages = [{"role": "system", "content": system_prompt}]
     if not no_brand_mode:

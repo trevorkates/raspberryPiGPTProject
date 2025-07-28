@@ -90,7 +90,7 @@ def classify_image(path, sensitivity, no_brand_mode):
 
     system_prompt = (
         "You are an expert factory QA inspector assessing a top-down image of a plastic trash-can lid. "
-        "Your primary goal is to identify true surface defects—scratches, dents, raised burrs, sink marks, or misaligned IML. "
+        "Your primary goal is to identify true surface defects—scratches, dents, raised burrs, faded or poor branding, or misaligned IML. "
         f"At strictness level {sensitivity}/5, apply this guidance: {focus} "
         "Completely disregard lighting glare, especially white streaks on dark or black areas—they are reflections, not defects. "
         "Do not mention glare; focus your judgement solely on physical deformities or printing faults. "

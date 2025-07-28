@@ -268,6 +268,16 @@ class LidInspectorApp:
                 self.reject_count += 1
                 self.reject_label.config(text=f"Rejected: {self.reject_count}")
                 accept_output.off()
+
+            # Save classification result to results folder
+            results_dir = "/home/keyence/results"
+            os.makedirs(results_dir, exist_ok=True)
+
+            verdict_label = "ACCEPT" if verdict.upper().startswith("ACCEPT") else "REJECT"
+            result_filename = f"{os.path.splitext(os.path.basename(path))[0]}_{verdict_label}.txt"
+            with open(os.path.join(results_dir, result_filename), "w") as f:
+                f.write(verdict)
+
         except Exception as e:
             self.result_lbl.config(fg="red", text=f"Error: {e}")
             accept_output.off()
@@ -288,6 +298,15 @@ class LidInspectorApp:
                 os.remove(os.path.join(FOLDER_PATH, fname))
             except Exception as e:
                 print(f"Error deleting {fname}: {e}")
+
+        results_dir = "/home/keyence/results"
+        if os.path.exists(results_dir):
+            for rname in os.listdir(results_dir):
+                try:
+                    os.remove(os.path.join(results_dir, rname))
+                except Exception as e:
+                    print(f"Error deleting result file {rname}: {e}")
+                    
         self.images.clear()
         self.seen.clear()
         self.idx = 0

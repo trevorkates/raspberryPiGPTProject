@@ -88,7 +88,7 @@ def classify_image(path, sensitivity, no_brand_mode):
     else:
         focus = level_text
 
-   system_prompt = (
+    system_prompt = (
         "You are a trained quality inspector analyzing a top-down image of a plastic trash-can lid. "
         "Follow strict inspection criteria used in manufacturing environments to determine whether the part passes. "
         "Use these rules:\n"

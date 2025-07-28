@@ -26,11 +26,11 @@ accept_output = OutputDevice(19, active_high=True, initial_value=False)
 
 # strictness guidance for each level - tightened lenient and relaxed
 LEVEL_GUIDANCE = {
-    1: "Reject only critical issues like holes, large cracks, short shots, or missing material. All other cosmetic defects are acceptable. Glare should be ignored.",
-    2: "Reject physical deformities like dents, deep scratches, or flash that affects handling or safety. Accept minor print variation, faint scuffs, or slight discoloration. Glare is not a defect.",
-    3: "Balanced: Labels and branding must be readable from 3 feet and generally well-positioned. Accept minor surface variation, color streaks, or small label shifts as long as they do not affect function or brand legibility.",
-    4: "Reject any defect clearly visible from 3 feet, including over- or under-branded hot stamps, misaligned or flaking labels, pitting, contamination, color streaking, flash, or warping.",
-    5: "Only perfectly molded and labeled parts are acceptable. Reject any surface blemish, flash, streak, label imperfection, or branding defect—even if subtle."
+    1: "Reject only critical issues like holes, cracks, short shots, or missing plastic. Pass all cosmetic variation unless it would interfere with use. Ignore all surface marks, streaks, and glare.",
+    2: "Reject for clear physical defects like deep dents, heavy flash, or print that's completely unreadable. Allow mild scuffing, slight print variation, or faint streaks. Do not reject for minor alignment or aesthetics.",
+    3: "Reject only if branding is unreadable from 3 feet, flash is sharp or prominent, or labels are clearly misaligned. Acceptable lids may have slight scuffing, color shift, or off-center but complete print.",
+    4: "Reject anything visually disruptive: off-center or overly dark/light branding, pitting, contamination, visible surface defects, or labels not cleanly applied. Lid should be visually clean and accurate on first glance.",
+    5: "Only flawless parts should pass. Reject for any blemish, misprint, label variation, flash, streak, or surface irregularity. All defects matter."
 }
 
 REFERENCE_EXAMPLES = {
@@ -92,25 +92,24 @@ def classify_image(path, sensitivity, no_brand_mode):
     else:
         focus = level_text
 
-    system_prompt = (
-        "You are a trained quality inspector analyzing a top-down image of a plastic trash-can lid. "
-        "Follow strict inspection criteria used in manufacturing environments to determine whether the part passes. "
-        "Use these rules:\n"
-        "- FLASH: Reject if flash is visible on edges, handles, or around logos—especially if sharp or inconsistent part-to-part.\n"
-        "- BRANDING (hot stamp or IML): Must match approved art. Reject if missing, misaligned, too dark (over-branded), too light (faded), or not readable from 3 feet. Letters and numbers must be complete.\n"
-        "- LABELS: Reject if crooked, lifting, peeling, or flaking. Must be fully adhered, straight, and complete.\n"
-        "- SHORT SHOT: Reject any sign of incomplete mold filling (visible gaps, thin areas, holes).\n"
-        "- AESTHETICS: Reject for heavy streaking, color variation, warping, or pitting if visible from 3 feet. Surface should be clean, smooth, and consistent.\n"
-        "- EXTERNAL INFLUENCE: Reject if contaminated with grease, dirt, or other foreign material.\n"
-        "Pass the part if it meets functional and visual expectations: if branding is readable, labels are intact and straight, there is no sharp flash, and surfaces are generally clean and uniform." 
-        "Acceptable parts may show minor handling marks or material variation as long as they don’t impact function or brand visibility."
-        f"At strictness level {sensitivity}/5, apply this guidance: {focus} "
-        "Ignore lighting glare, especially white streaks on dark surfaces—they are not defects. "
-        "Do not mention glare in your evaluation. "
-        "Respond with exactly one choice, formatted like this (no extra text):\n"
-        "ACCEPT - reason (Confidence: XX%)\n"
-        "REJECT - reason (Confidence: XX%)"
-    )
+        system_prompt = (
+            "You are a trained quality inspector analyzing a top-down image of a plastic trash-can lid. "
+            "Follow strict manufacturing inspection standards to determine whether the part passes. "
+            "Use these defect rules:\n"
+            "- FLASH: Reject if flash is visible on handles, lid edges, or around logos — especially if sharp or inconsistent.\n"
+            "- BRANDING: Hot stamps or IML must match approved artwork. Reject if unreadable from 3 feet, misaligned, over-dark, faded, smeared, or incomplete.\n"
+            "- LABELS: Reject if crooked, lifting, flaking, peeling, or not fully adhered.\n"
+            "- SHORT SHOTS: Reject any signs of incomplete mold filling (holes, gaps, missing features).\n"
+            "- AESTHETICS: Reject for pitting, surface contamination, excessive color streaking, or warping visible from 3 feet.\n"
+            "- FOREIGN MATERIAL: Reject if contaminated with grease, dirt, or foreign matter.\n\n"
+            "Parts should pass if they meet functional and visual expectations. If branding is readable, surfaces are generally uniform, and there are no major physical flaws, then the part is acceptable — even if it shows minor cosmetic variation such as light scuffing, off-center branding, or slight label shift. Do not reject parts that meet this standard.\n\n"
+            f"At strictness level {sensitivity}/5, apply this guidance: {focus} "
+            "Completely ignore glare — especially white streaks or shiny areas on dark plastic — they are not defects. "
+            "Do not mention glare in your evaluation. "
+            "Respond with exactly one choice, formatted like this (no extra text):\n"
+            "ACCEPT - reason (Confidence: XX%)\n"
+            "REJECT - reason (Confidence: XX%)"
+        )
 
     messages = [{"role": "system", "content": system_prompt}]
     if not no_brand_mode:

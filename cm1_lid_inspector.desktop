@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=CM1 Lid Inspector
+Comment=Launch the CM1 Lid Inspection UI
+Exec=bash -c 'export DISPLAY=:0; export XAUTHORITY=/home/pi/.Xauthority; /home/pi/run_ui.sh'
+Icon=/home/pi/inspector/lidIcon.png
+Terminal=false
+Categories=Utility;

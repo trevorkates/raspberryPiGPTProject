@@ -1,34 +1,49 @@
 #!/bin/bash
 
-# ----- SYSTEM PREP -----
+set -e
+
+echo "👤 Checking for 'keyence' user..."
+if id "keyence" &>/dev/null; then
+    echo "✅ 'keyence' user already exists."
+else
+    echo "🧑‍💻 Creating 'keyence' user..."
+    sudo useradd -m -s /bin/bash keyence
+    echo "🔑 Setting password to 'iv3pass'..."
+    echo "keyence:iv3pass" | sudo chpasswd
+fi
+
+# --- PERMISSIONS ---
+echo "🔒 Adding 'keyence' to system groups..."
+sudo usermod -aG sudo,gpio,video,dialout,plugdev,i2c,spi keyence
+
+# --- SYSTEM PACKAGES ---
 echo "📦 Updating system and installing dependencies..."
 sudo apt update && sudo apt install -y \
   python3-pip python3-tk libatlas-base-dev \
   git curl unzip
 
-echo "📦 Installing Python packages..."
+# --- PYTHON PACKAGES ---
+echo "🐍 Installing Python dependencies..."
 pip3 install openai python-dotenv pillow pymodbus
 
-# ----- FOLDER SETUP -----
-echo "📁 Creating project folders..."
-mkdir -p /home/pi/iv3_images
-mkdir -p /home/pi/inspector
+# --- FOLDER SETUP ---
+echo "📁 Creating folders under /home/keyence/..."
+sudo mkdir -p /home/keyence/{iv3_images,results,inspector}
+sudo chown -R keyence:keyence /home/keyence
 
-# ----- PLACEHOLDER .env -----
-if [ ! -f /home/pi/inspector/.env ]; then
-  echo "📝 Creating .env placeholder (edit to add your API key)..."
-  echo "OPENAI_API_KEY=your-api-key-here" > /home/pi/inspector/.env
+# --- PLACEHOLDER ENV FILE ---
+if [ ! -f /home/keyence/inspector/.env ]; then
+  echo "📝 Creating placeholder .env file..."
+  echo "OPENAI_API_KEY=your-api-key-here" | sudo tee /home/keyence/inspector/.env >/dev/null
+  sudo chown keyence:keyence /home/keyence/inspector/.env
 fi
 
-# ----- DOWNLOAD OR MOVE YOUR SCRIPT -----
-echo "📄 Make sure your script is saved as /home/pi/inspector/watcher_ui.py"
-echo "If not, copy or move it there before running."
-
-# ----- OPTIONAL: GRANT MODBUS PORT ACCESS -----
-echo "🔐 Allowing Python to use port 502 for Modbus..."
+# --- MODBUS TCP PERMISSION ---
+echo "🔐 Granting Python permission to use port 502..."
 PYTHON_BIN=$(which python3)
 sudo setcap 'cap_net_bind_service=+ep' "$PYTHON_BIN"
 
-# ----- DONE -----
-echo "✅ Setup complete. Add your OpenAI API key to /home/pi/inspector/.env"
-echo "Then run: python3 /home/pi/inspector/watcher_ui.py"
+echo "✅ Setup complete!"
+echo "🔁 You can now switch to the 'keyence' user and run the inspector:"
+echo "    su - keyence"
+echo "    bash /home/keyence/run_ui.sh"

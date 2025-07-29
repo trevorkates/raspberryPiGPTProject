@@ -22,6 +22,15 @@ openai.api_key = os.getenv("OPENAI_API_KEY")
 FOLDER_PATH   = "/home/keyence/iv3_images"
 POLL_INTERVAL = 1.5  # seconds between folder checks
 
+# Ensure /results folder exists and is writable
+results_dir = "/home/keyence/results"
+if not os.path.exists(results_dir):
+    os.makedirs(results_dir, exist_ok=True)
+    try:
+        os.system("sudo chown -R pi:pi /home/keyence/results")
+    except Exception as e:
+        print(f"⚠️ Could not change folder ownership: {e}")
+
 accept_output = OutputDevice(19, active_high=True, initial_value=False)
 
 # strictness guidance for each level - tightened lenient and relaxed
@@ -270,7 +279,7 @@ class LidInspectorApp:
                 accept_output.off()
 
             # Save classification result to results folder
-            results_dir = "/home/keyence/results"
+            # results_dir = "/home/keyence/results"
             os.makedirs(results_dir, exist_ok=True)
 
             verdict_label = "ACCEPT" if verdict.upper().startswith("ACCEPT") else "REJECT"
@@ -299,7 +308,7 @@ class LidInspectorApp:
             except Exception as e:
                 print(f"Error deleting {fname}: {e}")
 
-        results_dir = "/home/keyence/results"
+        # results_dir = "/home/keyence/results"
         if os.path.exists(results_dir):
             for rname in os.listdir(results_dir):
                 try:

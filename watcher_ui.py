@@ -44,7 +44,7 @@ LEVEL_GUIDANCE = {
 
 REFERENCE_EXAMPLES = {
     "https://i.imgur.com/xXbGo0g.jpeg": "ACCEPT - Clean IML sticker, clear and centered branding.",
-    "https://i.imgur.com/NDmSVPz.jpeg": "REJECT - White streaks are simply reflections, not defects.",
+    "https://i.imgur.com/NDmSVPz.jpeg": "REJECT - Streaks and scratches near branding is a defect and unacceptable.",
     "https://i.imgur.com/12zH9va.jpeg": "ACCEPT - Shine is due to lighting reflection, not a defect."
 }
 
@@ -90,37 +90,38 @@ def classify_image(path, sensitivity, no_brand_mode):
     except Exception as e:
         return f"Error: Unable to read image: {e}"
 
-    # level guidance or override
+    # choose guidance text
     level_text = LEVEL_GUIDANCE.get(sensitivity, LEVEL_GUIDANCE[3])
     if no_brand_mode:
-        focus = (
-            "Use common sense: pass parts with small visual imperfections if they don’t affect use or brand image. "
-            "Reject only if the issue is clearly visible or would cause confusion, damage, or rejection by a customer."
+        focus_text = (
+            "Ignore branding/IML criteria. Focus only on functional issues: short shots, cracks, holes, sharp/unsafe flash, "
+            "major contamination, obvious warping, or anything that would affect use. Minor cosmetic marks and glare are acceptable."
         )
-
     else:
-        focus = level_text
+        focus_text = level_text
 
-        system_prompt = (
-            "You are a trained quality inspector analyzing a top-down image of a plastic trash-can lid. "
-            "Follow strict manufacturing inspection standards to determine whether the part passes. "
-            "Use these defect rules:\n"
-            "- FLASH: Reject if flash is visible on handles, lid edges, or around logos — especially if sharp or inconsistent.\n"
-            "- BRANDING: Hot stamps or IML must match approved artwork. Reject if unreadable from 3 feet, misaligned, over-dark, faded, smeared, or incomplete.\n"
-            "- LABELS: Reject if crooked, lifting, flaking, peeling, or not fully adhered.\n"
-            "- SHORT SHOTS: Reject any signs of incomplete mold filling (holes, gaps, missing features).\n"
-            "- AESTHETICS: Reject for pitting, surface contamination, excessive color streaking, or warping visible from 3 feet.\n"
-            "- FOREIGN MATERIAL: Reject if contaminated with grease, dirt, or foreign matter.\n\n"
-            "Parts should pass if they meet functional and visual expectations. If branding is readable, surfaces are generally uniform, and there are no major physical flaws, then the part is acceptable — even if it shows minor cosmetic variation such as light scuffing, off-center branding, or slight label shift. Do not reject parts that meet this standard.\n\n"
-            f"At strictness level {sensitivity}/5, apply this guidance: {focus} "
-            "Completely ignore glare — especially white streaks or shiny areas on dark plastic — they are not defects. "
-            "Do not mention glare in your evaluation. "
-            "Respond with exactly one choice, formatted like this (no extra text):\n"
-            "ACCEPT - reason (Confidence: XX%)\n"
-            "REJECT - reason (Confidence: XX%)"
-        )
+    # always build the system prompt (works for both modes)
+    system_prompt = (
+        "You are a trained quality inspector analyzing a top-down image of a plastic trash-can lid. "
+        "Follow strict manufacturing inspection standards to determine whether the part passes. "
+        "Use these defect rules:\n"
+        "- FLASH: Reject if flash is visible on handles, lid edges, or around logos — especially if sharp or inconsistent.\n"
+        "- BRANDING: Hot stamps or IML must match approved artwork. Reject if unreadable from 3 feet, misaligned, over-dark, faded, smeared, or incomplete.\n"
+        "- LABELS: Reject if crooked, lifting, flaking, peeling, or not fully adhered.\n"
+        "- SHORT SHOTS: Reject any signs of incomplete mold filling (holes, gaps, missing features).\n"
+        "- AESTHETICS: Reject for pitting, surface contamination, excessive color streaking, or warping visible from 3 feet.\n"
+        "- FOREIGN MATERIAL: Reject if contaminated with grease, dirt, or foreign matter.\n\n"
+        f"At strictness level {sensitivity}/5, apply this guidance: {focus_text} "
+        "Completely ignore glare — especially white streaks or shiny areas on dark plastic — they are not defects. "
+        "Do not mention glare in your evaluation. "
+        "Respond with exactly one choice, formatted like this (no extra text):\n"
+        "ACCEPT - reason (Confidence: XX%)\n"
+        "REJECT - reason (Confidence: XX%)"
+    )
 
     messages = [{"role": "system", "content": system_prompt}]
+
+    # include few-shots only when branding rules are relevant
     if not no_brand_mode:
         for url, example in REFERENCE_EXAMPLES.items():
             messages.append({"role": "user", "content": f"{example} Image: {url}"})
